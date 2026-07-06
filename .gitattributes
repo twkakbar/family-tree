@@ -1,0 +1,13 @@
+# Normalize line endings: everything text is LF in the repo and on checkout.
+# This prevents CRLF breakage in shell scripts, Dockerfiles and Makefiles
+# when developing on Windows and deploying to Linux.
+* text=auto eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary

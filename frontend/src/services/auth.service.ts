@@ -1,0 +1,23 @@
+import { apiClient, unwrap } from "@/lib/api-client";
+import type { ApiEnvelope } from "@/types/api";
+import type { AuthResult, LoginInput, RegisterInput } from "@/types/auth";
+
+/**
+ * Auth API calls (docs/api/auth.md). The refresh token never appears here:
+ * it lives in an httpOnly cookie managed by the backend.
+ */
+export const authService = {
+  async register(input: RegisterInput): Promise<AuthResult> {
+    const res = await apiClient.post<ApiEnvelope<AuthResult>>("/auth/register", input);
+    return unwrap(res.data);
+  },
+
+  async login(input: LoginInput): Promise<AuthResult> {
+    const res = await apiClient.post<ApiEnvelope<AuthResult>>("/auth/login", input);
+    return unwrap(res.data);
+  },
+
+  async logout(): Promise<void> {
+    await apiClient.post("/auth/logout");
+  },
+};

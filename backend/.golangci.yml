@@ -1,0 +1,23 @@
+# golangci-lint configuration (v1.x schema).
+# Run locally:  golangci-lint run
+# CI runs gofmt + go vet + tests; golangci-lint is the extended local gate.
+run:
+  timeout: 5m
+
+linters:
+  disable-all: true
+  enable:
+    - errcheck
+    - govet
+    - staticcheck
+    - unused
+    - ineffassign
+    - misspell
+    - gofmt
+
+issues:
+  exclude-rules:
+    # Test helpers may ignore errors for brevity.
+    - path: _test\.go
+      linters:
+        - errcheck

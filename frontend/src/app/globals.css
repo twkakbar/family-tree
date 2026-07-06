@@ -1,0 +1,13 @@
+@import "tailwindcss";
+
+/* Design tokens (TailwindCSS v4 CSS-first config, ADR-0006).
+   Extend here instead of creating a tailwind.config file. */
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+    sans-serif;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
