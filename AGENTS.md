@@ -160,6 +160,13 @@ Implemented:
 - CI (backend vet/test/build, frontend lint/typecheck/build, docker build)
   and CD template (Docker Hub push as `twkakbar/family-tree-*` + SSH deploy).
 
+Released:
+- `v0.1.0` — first tag; CI green on `main`, all three images published to
+  Docker Hub (`twkakbar/family-tree-{backend,frontend,nginx}:v0.1.0` +
+  `latest`). Docker Hub secrets are configured in the GitHub repo. The SSH
+  deploy job is still disabled (`DEPLOY_ENABLED` repo variable not set) —
+  enable it once a VM exists, per `docs/DEPLOYMENT.md`.
+
 Not implemented yet (see `CONTEXT.md` roadmap — do these next, in order):
 - Phase 2: Families CRUD + collaborator management.
 - Phase 3: Persons CRUD + relationships + interactive tree view.
