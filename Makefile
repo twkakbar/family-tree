@@ -86,6 +86,24 @@ migrate-version: ## Show current migration version
 migrate-new: ## Create a new migration: make migrate-new name=create_x
 	cd backend && go run ./cmd/migrate new $(name)
 
+## -------- Ops / Phase 7 --------------------------------------
+
+.PHONY: backup
+backup: ## Run Postgres + uploads backup (see scripts/backup.sh)
+	bash scripts/backup.sh
+
+.PHONY: health-check
+health-check: ## Probe /healthz and /readyz (BASE_URL optional)
+	bash scripts/health-monitor.sh
+
+.PHONY: e2e
+e2e: ## Run Playwright smoke tests (stack must be up; BASE_URL optional)
+	cd e2e && npm test
+
+.PHONY: e2e-install
+e2e-install: ## Install e2e deps + Chromium
+	cd e2e && npm install && npx playwright install chromium
+
 ## -------- Help ------------------------------------------------
 
 .PHONY: help

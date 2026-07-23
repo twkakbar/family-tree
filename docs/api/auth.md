@@ -21,6 +21,7 @@ refresh token never appears in JSON.
     "name": "Jane Doe",
     "email": "jane@example.com",
     "role": "user",
+    "email_verified": true,
     "created_at": "2026-07-06T19:00:00Z"
   }
 }
@@ -82,6 +83,42 @@ in-memory access token (it expires within minutes regardless).
 
 Response: `204 No Content`.
 
+## POST /api/v1/auth/forgot-password
+
+Creates a password-reset token when the email exists. Always returns `200`
+with the same shape (no account enumeration). See ADR-0009.
+
+Request:
+
+```json
+{ "email": "jane@example.com" }
+```
+
+Response `data` (production):
+
+```json
+{
+  "requested": true,
+  "message": "If that email is registered, a reset token was created."
+}
+```
+
+In **non-production**, when a token was created, `reset_token` may also be
+present so local testing works without an admin.
+
+## POST /api/v1/auth/reset-password
+
+Consumes a one-time token and sets a new password. Revokes all sessions.
+
+Request:
+
+```json
+{ "token": "…", "new_password": "hunter2024" }
+```
+
+Validation: same strong password rules as register. Responses: `200`
+`{ "reset": true }` · `401 TOKEN_INVALID | TOKEN_EXPIRED` · `422`.
+
 ---
 
 ## Client integration (frontend reference)
@@ -89,3 +126,5 @@ Response: `204 No Content`.
 `frontend/src/lib/api-client.ts`: attach access token from memory → on 401
 run one single-flight `/auth/refresh` → retry the original request once →
 on refresh failure clear state and redirect to `/login`.
+
+User object now includes `email_verified` (boolean).

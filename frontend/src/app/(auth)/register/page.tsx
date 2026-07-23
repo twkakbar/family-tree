@@ -45,30 +45,34 @@ export default function RegisterPage() {
       : null;
 
   return (
-    <Card>
-      <CardTitle>Create your account</CardTitle>
-      <CardDescription>Start building your family tree in minutes.</CardDescription>
+    <Card className="border-0 bg-white/95 shadow-xl shadow-black/20 ring-teal-900/10">
+      <CardTitle className="font-display text-2xl text-teal-950">Create your account</CardTitle>
+      <CardDescription className="text-base">
+        Register so an administrator can grant tree edit access.
+      </CardDescription>
 
       <form className="mt-6 space-y-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         {apiError && <Alert tone="error">{apiError}</Alert>}
 
         <div>
-          <Label htmlFor="name">Full name</Label>
+          <Label htmlFor="name" className="text-base">Full name</Label>
           <Input
             id="name"
             autoComplete="name"
-            placeholder="Jane Doe"
+            className="py-3 text-base"
+            placeholder="Your name"
             error={form.formState.errors.name?.message}
             {...form.register("name")}
           />
         </div>
 
         <div>
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-base">Email</Label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
+            className="py-3 text-base"
             placeholder="you@example.com"
             error={form.formState.errors.email?.message}
             {...form.register("email")}
@@ -76,11 +80,12 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password" className="text-base">Password</Label>
           <Input
             id="password"
             type="password"
             autoComplete="new-password"
+            className="py-3 text-base"
             placeholder="At least 8 characters, letters and digits"
             error={form.formState.errors.password?.message}
             {...form.register("password")}
@@ -88,25 +93,26 @@ export default function RegisterPage() {
         </div>
 
         <div>
-          <Label htmlFor="confirmPassword">Confirm password</Label>
+          <Label htmlFor="confirmPassword" className="text-base">Confirm password</Label>
           <Input
             id="confirmPassword"
             type="password"
             autoComplete="new-password"
+            className="py-3 text-base"
             placeholder="Repeat your password"
             error={form.formState.errors.confirmPassword?.message}
             {...form.register("confirmPassword")}
           />
         </div>
 
-        <Button type="submit" className="w-full" loading={register.isPending}>
+        <Button type="submit" size="lg" className="w-full py-3.5 text-base" loading={register.isPending}>
           Create account
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
+      <p className="mt-6 text-center text-base text-slate-500">
         Already have an account?{" "}
-        <Link href="/login" className="font-semibold text-emerald-600 hover:text-emerald-500">
+        <Link href="/login" className="font-semibold text-teal-800 hover:text-teal-700">
           Sign in
         </Link>
       </p>

@@ -65,6 +65,8 @@ family-tree/
 ├── docker/
 │   └── nginx/                 ← reverse proxy image (routes /, /api, /uploads)
 ├── .github/workflows/         ← ci.yml (lint+test+build), deploy.yml (Docker Hub+SSH)
+├── scripts/                   ← backup.sh, health-monitor.sh (Phase 7 ops)
+├── e2e/                       ← Playwright smoke tests against Compose
 ├── docs/
 │   ├── api/                   ← API reference (implemented + planned contracts)
 │   ├── adr/                   ← Architecture Decision Records
@@ -147,32 +149,39 @@ Frontend:
 
 **Phase 1 — Foundation: COMPLETE**
 
+**Phase 2–3 — Families / persons / tree building blocks: COMPLETE**
+
+**Phase R — Aceh royal public pivot: COMPLETE**
+
+**Phase 4 — Photos & search: COMPLETE**
+
+**Phase 5 — JSON export/import: COMPLETE**
+
+**Phase 6 — Admin users & password reset: COMPLETE**
+
+**Phase 7 — Hardening: COMPLETE**
+
 Implemented:
-- Monorepo structure, documentation set, Docker dev/prod stacks, Nginx proxy.
-- Full database schema for the core domain (users, refresh_tokens, families,
-  family_collaborators, persons, relationships) via golang-migrate.
-- Backend Clean Architecture scaffold with the **auth vertical slice as the
-  reference implementation**: register, login, refresh-token rotation (opaque
-  token in httpOnly cookie) with reuse detection, logout, `/users/me`
-  (GET/PATCH), RBAC middleware (`admin`/`user`), bootstrap admin from env.
-- Frontend scaffold: landing page, login/register (RHF+Zod), protected
-  dashboard shell, axios client with silent token refresh, React Query setup.
-- CI (backend vet/test/build, frontend lint/typecheck/build, docker build)
-  and CD template (Docker Hub push as `twkakbar/family-tree-*` + SSH deploy).
+- Monorepo, docs, Docker, CI/CD, auth slice, person/relationship APIs,
+  recursive CTE ancestors/descendants.
+- Product pivot (ADR-0007): singleton royal family seed, public read APIs,
+  edit-access request approve flow, Aceh landing + R3F tree, studio,
+  admin approvals.
+- Phase 4: photo upload + trigram name search.
+- Phase 5: JSON export/import into the royal family (ADR-0008); GEDCOM deferred.
+- Phase 6: admin user list/patch/soft-delete, password-reset tokens without
+  SMTP (ADR-0009), `/admin/users` UI, forgot/reset password pages.
+- Phase 7: nginx CSP + security headers (ADR-0010), `scripts/backup.sh`,
+  `scripts/health-monitor.sh`, Playwright smoke E2E in CI against Compose.
 
 Released:
-- `v0.1.0` — first tag; CI green on `main`, all three images published to
-  Docker Hub (`twkakbar/family-tree-{backend,frontend,nginx}:v0.1.0` +
-  `latest`). Docker Hub secrets are configured in the GitHub repo. The SSH
-  deploy job is still disabled (`DEPLOY_ENABLED` repo variable not set) —
-  enable it once a VM exists, per `docs/DEPLOYMENT.md`.
+- `v0.1.0` — foundation images on Docker Hub; SSH deploy still optional.
 
-Not implemented yet (see `CONTEXT.md` roadmap — do these next, in order):
-- Phase 2: Families CRUD + collaborator management.
-- Phase 3: Persons CRUD + relationships + interactive tree view.
-- Phase 4: Photo upload, member search.
-- Phase 5: Export/import (JSON, GEDCOM later).
-- Phase 6: Admin panel (user management UI), audit polish.
+Not implemented yet (see `CONTEXT.md` / deferred):
+- SMTP email delivery (verification + reset emails).
+- GEDCOM export/import.
+- Nonce-based stricter CSP (follow-up to ADR-0010).
 
-Planned API contracts for future phases are pre-drafted in
-`docs/api/planned.md` — follow them unless there is a documented reason not to.
+API docs: `docs/api/public.md`, `docs/api/access-requests.md`,
+`docs/api/persons.md`, `docs/api/export-import.md`, `docs/api/admin-users.md`.
+Ops: `docs/DEPLOYMENT.md` (backups, monitoring, security headers).

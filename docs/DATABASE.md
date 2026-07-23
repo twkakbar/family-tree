@@ -13,9 +13,17 @@ erDiagram
         citext email "unique among active rows"
         text password_hash
         text role "admin | user"
+        timestamptz email_verified_at "null = unverified"
         timestamptz deleted_at "soft delete"
     }
     refresh_tokens {
+        uuid id PK
+        uuid user_id FK
+        text token_hash "sha256, unique"
+        timestamptz expires_at
+        timestamptz revoked_at "null = active"
+    }
+    password_reset_tokens {
         uuid id PK
         uuid user_id FK
         text token_hash "sha256, unique"
@@ -56,6 +64,7 @@ erDiagram
     }
 
     users ||--o{ refresh_tokens : "has sessions"
+    users ||--o{ password_reset_tokens : "may reset"
     users ||--o{ families : creates
     users ||--o{ family_collaborators : "is granted"
     families ||--o{ family_collaborators : "shared via"
@@ -84,8 +93,9 @@ erDiagram
 - **Deleting a person**: FK CASCADEs don't fire on soft delete, so the
   service layer must hard-delete the person's edges in the same transaction
   (Phase 3 rule).
-- `pg_trgm` is enabled for future name search; add the GIN index in the
-  Phase 4 migration that implements search.
+- `pg_trgm` is enabled (000001). Phase 4 adds `persons_name_trgm_idx` — a
+  partial GIN index on `(first_name || ' ' || last_name) gin_trgm_ops`
+  for family-scoped name search.
 
 ## Tree traversal (Phase 3 reference)
 

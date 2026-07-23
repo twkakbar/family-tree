@@ -33,4 +33,31 @@ var (
 
 	// ErrForbidden signals an authenticated request lacking permission.
 	ErrForbidden = errors.New("permission denied")
+
+	// ErrAlreadyCollaborator signals an invite for a user who already has
+	// access to the family.
+	ErrAlreadyCollaborator = errors.New("user is already a collaborator")
+
+	// ErrLastOwner signals an attempt to remove or demote the sole owner of
+	// a family.
+	ErrLastOwner = errors.New("family must retain at least one owner")
+
+	// ErrInvalidRelationship signals a relationship that violates tree
+	// invariants (wrong family, cycle, too many parents, self-edge).
+	ErrInvalidRelationship = errors.New("invalid relationship")
+
+	// ErrRelationshipExists signals a duplicate edge of the same type.
+	ErrRelationshipExists = errors.New("relationship already exists")
+
+	// ErrAccessRequestPending signals the user already has a pending request.
+	ErrAccessRequestPending = errors.New("access request already pending")
+
+	// ErrAlreadyEditor signals the user already has edit rights on the royal family.
+	ErrAlreadyEditor = errors.New("user already has edit access")
+
+	// ErrInvalidUpload signals a rejected photo (type, size, or empty file).
+	ErrInvalidUpload = errors.New("invalid upload")
+
+	// ErrUnsupportedFormat signals an export/import document the server rejects.
+	ErrUnsupportedFormat = errors.New("unsupported transfer format")
 )

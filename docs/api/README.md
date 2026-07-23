@@ -62,6 +62,12 @@ JSON envelope).
 
 | Area | Endpoints | Status |
 |------|-----------|--------|
-| Auth | `POST /auth/register`, `/auth/login`, `/auth/refresh`, `/auth/logout` | ✅ implemented |
+| Health | `GET /healthz`, `GET /readyz` (version in both) | ✅ implemented |
+| Auth | `POST /auth/register`, `/login`, `/refresh`, `/logout`, `/forgot-password`, `/reset-password` | ✅ implemented |
 | Users | `GET /users/me`, `PATCH /users/me` | ✅ implemented |
-| Families, persons, relationships, tree, search, export/import, admin | see [`planned.md`](planned.md) | 🔲 planned |
+| Families | Singleton royal family (seeded); legacy CRUD retired from product | ✅ pivot |
+| Persons, relationships, tree | see [`persons.md`](persons.md) — mutations for editors | ✅ implemented |
+| Public tree | see [`public.md`](public.md) | ✅ implemented |
+| Access requests | see [`access-requests.md`](access-requests.md) | ✅ implemented |
+| Export / import (JSON) | see [`export-import.md`](export-import.md) | ✅ implemented |
+| Admin users | see [`admin-users.md`](admin-users.md) | ✅ implemented |

@@ -62,8 +62,10 @@ cannot be made without breaking a rule, stop and update this document first
 - Services: unit tests with in-memory fakes of repository interfaces
   (pattern: `internal/service/auth_service_test.go`).
 - `pkg/`: pure unit tests.
-- Handlers/repos: integration tests are a Phase 7 goal; until then keep
-  handlers thin enough to not need them.
+- Handlers/repos: keep handlers thin; prefer service coverage over HTTP
+  integration tests unless a bug requires one.
+- E2E: Playwright smoke suite in `e2e/` against the Compose stack
+  (`make e2e-install`, `BASE_URL=… make e2e`). CI runs this on every PR.
 
 ## 4. Frontend rules (Next.js / TypeScript)
 

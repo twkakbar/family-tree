@@ -13,3 +13,7 @@ Format: Status / Context / Decision / Consequences. Keep them under a page.
 | [0004](0004-auth-tokens.md) | JWT access token + rotating opaque refresh cookie | Accepted |
 | [0005](0005-same-origin.md) | Same-origin routing via nginx (prod) / Next rewrites (dev) | Accepted |
 | [0006](0006-tailwind-v4.md) | TailwindCSS v4 CSS-first configuration | Accepted |
+| [0007](0007-public-royal-tree-r3f.md) | Public Aceh royal tree + React Three Fiber | Accepted |
+| [0008](0008-json-export-import-singleton.md) | JSON export/import into singleton royal family | Accepted |
+| [0009](0009-password-reset-no-smtp.md) | Password reset / email_verified without SMTP | Accepted |
+| [0010](00010-csp-security-headers.md) | CSP + hardened security headers at nginx | Accepted |

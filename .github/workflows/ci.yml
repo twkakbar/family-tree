@@ -98,3 +98,76 @@ jobs:
           push: false
           cache-from: type=gha,scope=frontend
           cache-to: type=gha,scope=frontend,mode=max
+
+  e2e:
+    name: E2E smoke (Playwright + Compose)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    timeout-minutes: 45
+    env:
+      NGINX_HTTP_PORT: "8088"
+      BASE_URL: http://127.0.0.1:8088
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Write CI .env for production compose
+        run: |
+          printf '%s\n' \
+            'COMPOSE_FILE=docker-compose.yml' \
+            'BACKEND_IMAGE=family-tree/backend:local' \
+            'FRONTEND_IMAGE=family-tree/frontend:local' \
+            'NGINX_IMAGE=family-tree/nginx:local' \
+            'NGINX_HTTP_PORT=8088' \
+            'POSTGRES_USER=familytree' \
+            'POSTGRES_PASSWORD=ci-postgres-password' \
+            'POSTGRES_DB=familytree' \
+            'JWT_SECRET=ci-only-secret-change-me-min-32-characters!!' \
+            'COOKIE_SECURE=false' \
+            'RUN_MIGRATIONS=true' \
+            'LOG_LEVEL=info' \
+            'ROYAL_FAMILY_NAME=Kesultanan Aceh' \
+            > .env
+
+      - name: Start stack
+        run: docker compose -f docker-compose.yml up -d --build
+
+      - name: Wait for readiness
+        run: |
+          for i in $(seq 1 60); do
+            if curl -fsS "$BASE_URL/readyz" | grep -q '"status":"ok"'; then
+              echo "ready after ${i} attempts"
+              exit 0
+            fi
+            sleep 5
+          done
+          docker compose -f docker-compose.yml ps
+          docker compose -f docker-compose.yml logs --tail=80
+          exit 1
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install chromium --with-deps
+
+      - name: Run smoke tests
+        working-directory: e2e
+        run: npm test
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e/playwright-report/
+          retention-days: 7
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose -f docker-compose.yml down -v

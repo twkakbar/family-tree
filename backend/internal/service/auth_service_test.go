@@ -14,9 +14,10 @@ import (
 func newTestAuthService() (domain.AuthService, *fakeUserRepo, *fakeRefreshTokenRepo) {
 	users := newFakeUserRepo()
 	tokens := newFakeRefreshTokenRepo()
+	resets := newFakePasswordResetTokenRepo()
 	jwt := token.NewJWTManager("test-secret-that-is-32-characters!!", "test", 15*time.Minute)
 	hasher := password.NewHasher(4) // low cost for fast tests
-	svc := NewAuthService(users, tokens, jwt, hasher, time.Hour)
+	svc := NewAuthService(users, tokens, resets, jwt, hasher, time.Hour)
 	return svc, users, tokens
 }
 

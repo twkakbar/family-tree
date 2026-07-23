@@ -46,3 +46,31 @@ func (p *Person) FullName() string {
 	}
 	return p.FirstName + " " + p.LastName
 }
+
+// Valid reports whether the gender value is supported.
+func (g Gender) Valid() bool {
+	switch g {
+	case GenderMale, GenderFemale, GenderOther, GenderUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// PersonWithDepth is a person returned by ancestor/descendant traversals.
+type PersonWithDepth struct {
+	Person Person
+	Depth  int
+}
+
+// PersonDetail is a person with their incident relationship edges.
+type PersonDetail struct {
+	Person        Person
+	Relationships []Relationship
+}
+
+// FamilyTree is the full graph payload for client-side rendering.
+type FamilyTree struct {
+	Persons       []Person
+	Relationships []Relationship
+}

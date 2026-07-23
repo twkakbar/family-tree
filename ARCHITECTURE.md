@@ -125,18 +125,20 @@ Details: ADR-0004; API reference: `docs/api/auth.md`.
   token and issues a new pair. Presenting an already-revoked token revokes
   ALL of the user's refresh tokens (stolen-token signal) and returns 401.
 - **RBAC**: global role (`admin`/`user`) is embedded in JWT claims and
-  enforced by `middleware.RequireRole`. Per-family permissions
-  (owner/editor/viewer) live in `family_collaborators` and are enforced in
-  the service layer (Phase 2).
+  enforced by `middleware.RequireRole`. The site has **one** royal family;
+  write access requires global `admin` **or** an `owner`/`editor` row in
+  `family_collaborators` for that family (enforced in the service layer).
+  Public tree reads use `/api/v1/public/*` with no JWT (ADR-0007).
 - **Password hashing**: bcrypt, configurable cost (`BCRYPT_COST`, default 12).
 - **Bootstrap admin**: on startup, if `ADMIN_EMAIL` + `ADMIN_PASSWORD` are
   set and the account doesn't exist, it is created with role `admin`.
+  The royal family is seeded and owned by that admin (or the first admin).
 - Frontend flow: axios interceptor attaches the access token; on 401 it
   performs a single-flight `POST /auth/refresh` (cookie-based) and retries
   once; if refresh fails it clears state and redirects to `/login`.
-  `src/middleware.ts` additionally redirects unauthenticated visitors away
-  from `/dashboard` based on cookie presence (UX only — real enforcement is
-  always API-side).
+  `src/middleware.ts` protects `/studio` and `/admin/*` based on cookie
+  presence (UX only — real enforcement is always API-side). Public routes
+  `/` and `/explore` need no session.
 
 ## 4. Frontend architecture
 
@@ -164,22 +166,25 @@ page/component ──► hook (React Query) ──► service ──► lib/api-
 
 | Route | Group | Access | Purpose |
 |-------|-------|--------|---------|
-| `/` | — | public | Landing page |
-| `/login`, `/register` | `(auth)` | public (redirects to dashboard if session cookie present) | Auth forms |
-| `/dashboard` | `(dashboard)` | authenticated | App shell + phase-2+ entry points |
-| future: `/families`, `/families/[id]`, `/families/[id]/tree`, `/admin/users` | `(dashboard)` | authenticated | See roadmap |
+| `/` | — | public | Aceh royal branded landing |
+| `/explore` | — | public | Immersive 3D tree viewer (R3F) |
+| `/login`, `/register` | `(auth)` | public | Auth forms |
+| `/request-access` | `(dashboard)` | authenticated | Descendant edit-access request |
+| `/studio` | `(dashboard)` | editor/admin | Mutate persons & relationships |
+| `/admin/requests` | `(dashboard)` | super-admin | Approve/reject access requests |
 
-Route groups share layouts: `(auth)` renders a centered card; `(dashboard)`
-renders the header shell and performs the client-side auth guard (`useMe`).
+Route groups: `(auth)` centered card; `(dashboard)` header + client auth
+guard (`useMe`). Explore uses a minimal chrome layout.
 
 ### Styling & UI
 
 - TailwindCSS v4 (CSS-first config in `src/app/globals.css` via `@theme`;
-  no `tailwind.config` file — see ADR-0006). Design tokens: primary emerald
-  palette, neutral grays.
-- Reusable primitives in `components/ui/` (Button, Input, Label, Card,
-  Alert, Spinner) using `cn()` (clsx + tailwind-merge) for variants.
-  Compose these; do not restyle ad hoc.
+  no `tailwind.config` file — see ADR-0006). Public brand: deep teal /
+  indigo sea tones with warm gold accents (Aceh maritime/sultanate).
+- 3D canvas: `three` + `@react-three/fiber` + `@react-three/drei`
+  (ADR-0007), dynamically imported on `/explore`.
+- Reusable primitives in `components/ui/`; feature UI in
+  `components/{tree,persons,admin}/`.
 
 ## 5. API architecture
 
@@ -232,24 +237,27 @@ Target: one Linux VM with Docker. Full runbook: `docs/DEPLOYMENT.md`.
 - **Nginx** (only published port): routes `/api/*` → backend,
   `/uploads/*` → shared volume (static, cache headers), everything else →
   frontend (with WebSocket upgrade for HMR in dev). Applies gzip, security
-  headers, `client_max_body_size 10m`, and rate limiting on `/api/`
-  (stricter on `/api/v1/auth/`). TLS via Let's Encrypt (commented server
-  block + runbook).
+  headers + CSP (ADR-0010), `client_max_body_size 10m`, and rate limiting on
+  `/api/` (stricter on `/api/v1/auth/`). TLS via Let's Encrypt (commented
+  server block + runbook).
 - **Backend**: multi-stage build → static binary on Alpine, non-root user,
   healthcheck on `/healthz`. Applies migrations on boot (single instance).
 - **Frontend**: Next.js standalone output, non-root, healthcheck.
 - **Postgres**: internal network only; named volume `postgres_data`;
-  `pg_dump` backup cron documented.
+  backup via `scripts/backup.sh` (cron documented).
 - **Volumes**: `postgres_data`, `uploads_data` (backend read-write, nginx
   read-only).
 - **Images**: built locally by default (`*_IMAGE` env overrides allow pulling
   `twkakbar/family-tree-*` from Docker Hub instead — used by CD).
+- **Monitoring**: `/healthz` + `/readyz` (versioned JSON); cron script
+  `scripts/health-monitor.sh` and external uptime on `/readyz`.
 
 ## 8. CI/CD
 
 - `ci.yml` (push to main + PRs): backend job (gofmt check, `go vet`,
   `go test -race`, build), frontend job (`npm ci`, ESLint, `tsc --noEmit`,
-  `next build`), docker job (compose build sanity check).
+  `next build`), docker job (image build sanity), **e2e job** (Compose up +
+  Playwright smoke against nginx).
 - `deploy.yml` (git tag `v*` or manual): builds and pushes images to Docker
   Hub (`twkakbar/family-tree-backend|frontend|nginx`), then (if
   `DEPLOY_ENABLED` repo variable is `true`) SSHes into the VM and runs
@@ -266,6 +274,10 @@ Target: one Linux VM with Docker. Full runbook: `docs/DEPLOYMENT.md`.
 | `docs/adr/0004` | JWT access in memory + rotating opaque refresh token in httpOnly cookie |
 | `docs/adr/0005` | Same-origin routing via Nginx (prod) and Next rewrites (dev) |
 | `docs/adr/0006` | TailwindCSS v4 CSS-first configuration |
+| `docs/adr/0007` | Public Aceh royal tree + React Three Fiber |
+| `docs/adr/0008` | JSON export/import into singleton royal family |
+| `docs/adr/0009` | Password reset / email_verified without SMTP |
+| `docs/adr/0010` | CSP + hardened security headers at nginx |
 
 Add a new ADR whenever a decision changes structure, stack, security model or
 data model.

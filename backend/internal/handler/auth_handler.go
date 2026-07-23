@@ -16,13 +16,14 @@ const refreshCookieName = "ft_refresh"
 
 // AuthHandler adapts HTTP to the AuthService.
 type AuthHandler struct {
-	auth domain.AuthService
-	cfg  config.AuthConfig
+	auth             domain.AuthService
+	cfg              config.AuthConfig
+	exposeResetToken bool // non-production: include token in forgot-password response
 }
 
 // NewAuthHandler builds the auth endpoints handler.
-func NewAuthHandler(auth domain.AuthService, cfg config.AuthConfig) *AuthHandler {
-	return &AuthHandler{auth: auth, cfg: cfg}
+func NewAuthHandler(auth domain.AuthService, cfg config.AuthConfig, exposeResetToken bool) *AuthHandler {
+	return &AuthHandler{auth: auth, cfg: cfg, exposeResetToken: exposeResetToken}
 }
 
 // Register handles POST /api/v1/auth/register.
@@ -94,6 +95,49 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 
 	h.clearRefreshCookie(c)
 	c.Status(http.StatusNoContent)
+}
+
+type forgotPasswordRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+type resetPasswordRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required,strong_password"`
+}
+
+// ForgotPassword handles POST /api/v1/auth/forgot-password.
+func (h *AuthHandler) ForgotPassword(c *gin.Context) {
+	var req forgotPasswordRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	raw, err := h.auth.RequestPasswordReset(c.Request.Context(), req.Email)
+	if err != nil {
+		respondError(c, err)
+		return
+	}
+	payload := gin.H{
+		"requested": true,
+		"message":   "If that email is registered, a reset token was created.",
+	}
+	if h.exposeResetToken && raw != "" {
+		payload["reset_token"] = raw
+	}
+	response.OK(c, http.StatusOK, payload)
+}
+
+// ResetPassword handles POST /api/v1/auth/reset-password.
+func (h *AuthHandler) ResetPassword(c *gin.Context) {
+	var req resetPasswordRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	if err := h.auth.ResetPassword(c.Request.Context(), req.Token, req.NewPassword); err != nil {
+		respondError(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, gin.H{"reset": true})
 }
 
 func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string, expiresAt time.Time) {

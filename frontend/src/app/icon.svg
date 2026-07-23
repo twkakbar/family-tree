@@ -1,9 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="7" fill="#059669"/>
-  <g fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round">
-    <circle cx="16" cy="8" r="3"/>
-    <circle cx="8" cy="24" r="3"/>
-    <circle cx="24" cy="24" r="3"/>
-    <path d="M16 11v5m0 0-6.5 5.5M16 16l6.5 5.5"/>
+  <rect width="32" height="32" rx="7" fill="#04151a"/>
+  <rect x="1.5" y="1.5" width="29" height="29" rx="6" fill="none" stroke="#d4af37" stroke-width="1.5"/>
+  <g fill="#d4af37">
+    <!-- Acehnese rencong silhouette -->
+    <path d="M24.2 5.2c-2.2 0.25-5.8 1.8-9.4 5.2-3.8 3.6-7 8.6-8.3 12.5-0.25 0.75 0.65 1.35 1.25 0.85 3.1-2.3 6.7-6.9 9.5-10.5 2.5-3.1 4.7-5.4 6.3-6.5 0.6-0.4 0.85-1.35 0.65-1.55z"/>
+    <path d="M6.1 23.2c-1.15 1-1.9 2.4-1.75 3.25 0.15 0.9 1.15 1.35 2.25 1.1 0.9-0.2 1.9-1 2.65-1.9-1.15-0.5-2.25-1.35-3.15-2.45z"/>
+    <path d="M9.1 21c0.65 0.75 1.4 1.35 2.15 1.75l1.15-1.5c-0.65-0.35-1.25-0.85-1.75-1.5L9.1 21z"/>
   </g>
 </svg>

@@ -11,6 +11,7 @@ Implemented by `backend/internal/handler/user_handler.go`. Requires
   "name": "Jane Doe",
   "email": "jane@example.com",
   "role": "user",
+  "email_verified": true,
   "created_at": "2026-07-06T19:00:00Z"
 }
 ```
@@ -25,8 +26,8 @@ Responses: `200` User · `401` when unauthenticated.
 
 ## PATCH /api/v1/users/me
 
-Updates the caller's profile. Email and password changes are deliberately
-excluded until the verification flow lands (Phase 6).
+Updates the caller's profile. Email changes stay out of scope until SMTP
+verification exists. Password changes use forgot/reset (ADR-0009).
 
 Request:
 

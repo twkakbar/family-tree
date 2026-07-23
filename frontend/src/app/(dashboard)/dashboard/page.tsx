@@ -1,43 +1,63 @@
 "use client";
 
-import { Card, CardDescription, CardTitle } from "@/components/ui/card";
+import Link from "next/link";
+
 import { useMe } from "@/hooks/use-auth";
+import { useStudioCanEdit } from "@/hooks/use-public";
 
-/**
- * Dashboard landing. Phase 1 shows the roadmap; Phase 2 replaces the
- * placeholder cards with the family list (see CONTEXT.md).
- */
-const upcoming = [
-  { title: "Families", phase: "Phase 2", description: "Create families and invite collaborators." },
-  { title: "Family members", phase: "Phase 3", description: "Add persons and define relationships." },
-  { title: "Tree view", phase: "Phase 3", description: "Explore your interactive family tree." },
-  { title: "Photos & search", phase: "Phase 4", description: "Profile pictures and member search." },
-  { title: "Export / import", phase: "Phase 5", description: "Back up or move family trees as JSON." },
-];
-
+/** Quiet account hub for signed-in users (no public marketing of auth). */
 export default function DashboardPage() {
   const { data: user } = useMe();
+  const canEdit = useStudioCanEdit();
 
   return (
-    <div>
-      <h1 className="text-2xl font-bold text-slate-900">
-        Welcome{user ? `, ${user.name}` : ""}
-      </h1>
-      <p className="mt-1 text-slate-600">
-        Your account is ready{user?.role === "admin" ? " (administrator)" : ""}. Family tree
-        features are on the way — here is what lands next.
-      </p>
+    <div className="mx-auto max-w-lg space-y-6">
+      <div>
+        <p className="text-sm font-semibold uppercase tracking-wider text-teal-800/70">Account</p>
+        <h1 className="font-display mt-1 text-4xl text-teal-950">
+          Hello{user ? `, ${user.name}` : ""}
+        </h1>
+        <p className="mt-3 text-lg text-slate-600">Choose where to go next.</p>
+      </div>
 
-      <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {upcoming.map((item) => (
-          <Card key={item.title} className="relative opacity-80">
-            <span className="absolute right-4 top-4 rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-              {item.phase}
-            </span>
-            <CardTitle>{item.title}</CardTitle>
-            <CardDescription>{item.description}</CardDescription>
-          </Card>
-        ))}
+      <div className="grid gap-3">
+        <Link
+          href="/"
+          className="rounded-2xl bg-white/90 px-5 py-4 text-lg font-semibold text-teal-950 ring-1 ring-teal-900/10 hover:ring-teal-600/40"
+        >
+          View the public tree
+        </Link>
+        {canEdit.data?.can_edit ? (
+          <Link
+            href="/studio"
+            className="rounded-2xl bg-teal-800 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-900"
+          >
+            Open studio — add members
+          </Link>
+        ) : (
+          <Link
+            href="/request-access"
+            className="rounded-2xl bg-teal-800 px-5 py-4 text-lg font-semibold text-white hover:bg-teal-900"
+          >
+            Ask for edit access
+          </Link>
+        )}
+        {user?.role === "admin" && (
+          <>
+            <Link
+              href="/admin/requests"
+              className="rounded-2xl bg-white/90 px-5 py-4 text-lg font-semibold text-teal-950 ring-1 ring-teal-900/10 hover:ring-teal-600/40"
+            >
+              Review edit requests
+            </Link>
+            <Link
+              href="/admin/users"
+              className="rounded-2xl bg-white/90 px-5 py-4 text-lg font-semibold text-teal-950 ring-1 ring-teal-900/10 hover:ring-teal-600/40"
+            >
+              Manage accounts
+            </Link>
+          </>
+        )}
       </div>
     </div>
   );

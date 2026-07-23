@@ -55,6 +55,8 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
       ADMIN_NAME: ${ADMIN_NAME:-Administrator}
+      ROYAL_FAMILY_NAME: ${ROYAL_FAMILY_NAME:-Kesultanan Aceh}
+      ROYAL_FAMILY_DESCRIPTION: ${ROYAL_FAMILY_DESCRIPTION:-Silsilah keluarga kerajaan Aceh untuk dijelajahi publik.}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

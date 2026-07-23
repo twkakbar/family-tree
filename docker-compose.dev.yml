@@ -54,7 +54,13 @@ services:
     volumes:
       - ./frontend:/app
       # Keep container-installed dependencies; do not shadow with host files.
-      # After changing package.json: docker compose build frontend && docker compose up -V frontend
+      # After changing package.json / lockfile, refresh BOTH the image and the
+      # named volume (named volumes are NOT replaced by --build alone):
+      #   docker compose build --no-cache frontend
+      #   docker compose stop frontend
+      #   docker volume rm family-tree_frontend_node_modules
+      #   docker compose up -d frontend
+      # Or inside a running container: docker compose exec frontend npm install
       - frontend_node_modules:/app/node_modules
       - frontend_next_cache:/app/.next
     healthcheck:

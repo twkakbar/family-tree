@@ -35,7 +35,14 @@ apiClient.interceptors.request.use((config) => {
 });
 
 /** Endpoints that must never trigger a refresh-retry loop. */
-const AUTH_PATHS = ["/auth/login", "/auth/register", "/auth/refresh", "/auth/logout"];
+const AUTH_PATHS = [
+  "/auth/login",
+  "/auth/register",
+  "/auth/refresh",
+  "/auth/logout",
+  "/auth/forgot-password",
+  "/auth/reset-password",
+];
 
 const isAuthPath = (url: string | undefined): boolean =>
   AUTH_PATHS.some((p) => url?.includes(p));

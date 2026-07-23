@@ -38,9 +38,9 @@ function LoginForm() {
     login.error instanceof ApiError && !login.isPending ? login.error.message : null;
 
   return (
-    <Card>
-      <CardTitle>Welcome back</CardTitle>
-      <CardDescription>Sign in to continue to your family trees.</CardDescription>
+    <Card className="border-0 bg-white/95 shadow-xl shadow-black/20 ring-teal-900/10">
+      <CardTitle className="font-display text-2xl text-teal-950">Welcome back</CardTitle>
+      <CardDescription className="text-base">Sign in to edit the royal family tree.</CardDescription>
 
       <form
         className="mt-6 space-y-4"
@@ -50,11 +50,12 @@ function LoginForm() {
         {apiError && <Alert tone="error">{apiError}</Alert>}
 
         <div>
-          <Label htmlFor="email">Email</Label>
+          <Label htmlFor="email" className="text-base">Email</Label>
           <Input
             id="email"
             type="email"
             autoComplete="email"
+            className="py-3 text-base"
             placeholder="you@example.com"
             error={form.formState.errors.email?.message}
             {...form.register("email")}
@@ -62,25 +63,31 @@ function LoginForm() {
         </div>
 
         <div>
-          <Label htmlFor="password">Password</Label>
+          <Label htmlFor="password" className="text-base">Password</Label>
           <Input
             id="password"
             type="password"
             autoComplete="current-password"
+            className="py-3 text-base"
             placeholder="••••••••"
             error={form.formState.errors.password?.message}
             {...form.register("password")}
           />
+          <p className="mt-2 text-sm">
+            <Link href="/forgot-password" className="font-semibold text-teal-800 hover:text-teal-700">
+              Forgot password?
+            </Link>
+          </p>
         </div>
 
-        <Button type="submit" className="w-full" loading={login.isPending}>
+        <Button type="submit" size="lg" className="w-full py-3.5 text-base" loading={login.isPending}>
           Sign in
         </Button>
       </form>
 
-      <p className="mt-6 text-center text-sm text-slate-500">
+      <p className="mt-6 text-center text-base text-slate-500">
         No account yet?{" "}
-        <Link href="/register" className="font-semibold text-emerald-600 hover:text-emerald-500">
+        <Link href="/register" className="font-semibold text-teal-800 hover:text-teal-700">
           Create one
         </Link>
       </p>

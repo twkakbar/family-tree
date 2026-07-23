@@ -1,13 +1,40 @@
 @import "tailwindcss";
 
-/* Design tokens (TailwindCSS v4 CSS-first config, ADR-0006).
-   Extend here instead of creating a tailwind.config file. */
 @theme {
-  --font-sans:
-    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial,
-    sans-serif;
+  --font-sans: var(--font-source-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-cormorant), ui-serif, Georgia, serif;
+  --color-aceh-ink: #04151a;
+  --color-aceh-sea: #0a3d42;
+  --color-aceh-teal: #1a9b8e;
+  --color-aceh-foam: #e8f6f4;
+  --color-aceh-gold: #d4af37;
+  --color-aceh-sand: #f7f1e3;
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  @apply bg-[var(--color-aceh-foam)] text-slate-900 antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Authenticated app chrome — calm sea + soft sand */
+.aceh-shell {
+  min-height: 100dvh;
+  background:
+    radial-gradient(ellipse 90% 50% at 10% -10%, rgba(26, 155, 142, 0.18), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(212, 175, 55, 0.12), transparent 50%),
+    linear-gradient(180deg, #e8f6f4 0%, #f7f1e3 45%, #eef5f4 100%);
+}
+
+.aceh-panel {
+  @apply rounded-2xl bg-white/90 p-6 shadow-sm ring-1 ring-teal-900/10 backdrop-blur-sm sm:p-8;
+}
+
+.aceh-sea-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(20, 184, 166, 0.28), transparent 55%),
+    radial-gradient(ellipse 50% 40% at 90% 80%, rgba(212, 175, 55, 0.12), transparent 50%),
+    linear-gradient(180deg, #04151a 0%, #062a30 45%, #04151a 100%);
 }

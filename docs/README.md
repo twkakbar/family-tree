@@ -11,5 +11,5 @@ points; everything here goes deeper.
 | [`api/users.md`](api/users.md) | User endpoints (implemented) |
 | [`api/planned.md`](api/planned.md) | Pre-designed contracts for Phases 2–6 |
 | [`DATABASE.md`](DATABASE.md) | ERD, table reference, migration workflow, tree queries |
-| [`DEPLOYMENT.md`](DEPLOYMENT.md) | VM provisioning, TLS, backups, CI/CD deploys |
+| [`DEPLOYMENT.md`](DEPLOYMENT.md) | VM provisioning, TLS, backups, monitoring, CSP, CI/CD |
 | [`adr/`](adr/README.md) | Architecture Decision Records |

@@ -105,32 +105,65 @@ NGINX_IMAGE=twkakbar/family-tree-nginx:latest
 
 ## 6. Backups
 
+Use the repo script (keeps dump + uploads + retention in one place):
+
 ```bash
-# /opt/family-tree/backup.sh
-#!/usr/bin/env bash
-set -euo pipefail
-cd /opt/family-tree
-mkdir -p backups
-docker compose -f docker-compose.yml exec -T postgres \
-  pg_dump -U "$(grep ^POSTGRES_USER .env | cut -d= -f2)" \
-          "$(grep ^POSTGRES_DB .env | cut -d= -f2)" \
-  | gzip > "backups/familytree-$(date +%F).sql.gz"
-find backups -name '*.sql.gz' -mtime +14 -delete
-tar -czf "backups/uploads-$(date +%F).tar.gz" -C \
-  "$(docker volume inspect family-tree_uploads_data -f '{{.Mountpoint}}')" . || true
+# on the VM
+sudo cp /opt/family-tree/scripts/backup.sh /opt/family-tree/backup.sh
+sudo chmod +x /opt/family-tree/backup.sh
+# optional: APP_DIR=/opt/family-tree BACKUP_DIR=/var/backups/family-tree
 ```
 
-`crontab -e`: `0 3 * * * /opt/family-tree/backup.sh` — and copy `backups/`
-off the VM (object storage, rsync target, …).
+`crontab -e`:
 
-Restore: `gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U <user> <db>`.
+```cron
+0 3 * * * /opt/family-tree/backup.sh >> /var/log/family-tree-backup.log 2>&1
+```
 
-## 7. Operations cheat sheet
+Copy `backups/` off the VM regularly (object storage, rsync, …).
+
+Restore DB:
+
+```bash
+gunzip -c backups/familytree-YYYY-MM-DD.sql.gz \
+  | docker compose -f docker-compose.yml exec -T postgres \
+      psql -U <user> <db>
+```
+
+## 7. Monitoring
+
+Probes (also used by Docker healthchecks):
+
+| URL | Meaning |
+|-----|---------|
+| `GET /healthz` | Process up (`{"status":"ok","version":…}`) |
+| `GET /readyz` | DB reachable (`{"status":"ok","version":…}`) |
+
+Cron / external uptime (every 5 minutes):
+
+```cron
+*/5 * * * * BASE_URL=https://example.com /opt/family-tree/scripts/health-monitor.sh \
+  >> /var/log/family-tree-health.log 2>&1
+```
+
+Point an uptime service (UptimeRobot, Better Stack, …) at `/readyz`.
+Alert on non-200 or missing `"status":"ok"`.
+
+## 8. Security headers (Phase 7)
+
+Nginx applies CSP and related headers via
+`docker/nginx/conf.d/security-headers.inc` (ADR-0010). After enabling TLS,
+add HSTS (+ optional `upgrade-insecure-requests`) in the TLS server block
+template in `default.conf`.
+
+## 9. Operations cheat sheet
 
 | Task | Command |
 |------|---------|
 | Logs (all / one service) | `docker compose logs -f --tail=100 [backend]` |
 | Service status + health | `docker compose ps` |
+| Manual health probe | `make health-check` / `BASE_URL=… bash scripts/health-monitor.sh` |
+| Manual backup | `make backup` / `bash scripts/backup.sh` |
 | Restart one service | `docker compose restart backend` |
 | DB shell | `docker compose exec postgres psql -U familytree familytree` |
 | Migration status | `docker compose exec backend /app/migrate version` |
@@ -146,3 +179,4 @@ Restore: `gunzip -c backup.sql.gz | docker compose exec -T postgres psql -U <use
 | Backend exits: `database is dirty` | Failed migration → see docs/DATABASE.md dirty-state recovery. |
 | Login works, session lost after refresh | `COOKIE_SECURE=true` while serving plain HTTP — browsers drop the cookie. Enable TLS or set it to false temporarily. |
 | Uploads 404 in production | `uploads_data` volume not mounted in nginx, or backend wrote outside `/app/uploads`. |
+| Blank page / CSP console errors | See ADR-0010; report blocked directives before tightening further. |

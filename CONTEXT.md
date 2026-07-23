@@ -1,129 +1,114 @@
 # CONTEXT.md — Business & Product Context
 
-This document explains **what** the Family Tree application is and **why** it
-exists. For **how** it is built, read `ARCHITECTURE.md`.
+This document explains **what** the application is and **why** it exists.
+For **how** it is built, read `ARCHITECTURE.md`.
 
 ## 1. Business overview
 
-Family Tree is a self-hosted web application for creating, managing and
-exploring family trees. A user creates one or more *families*, adds *persons*
-(family members) to them, connects persons with *relationships*
-(parent/child, spouse), and views the result as an interactive tree. Families
-can be shared with other users for collaboration, and trees can be exported
-and imported for backup or migration.
+**Kesultanan Aceh Family Tree** is a public, self-hosted web application that
+presents the royal lineage of the Aceh sultanate. Anyone can explore the
+canonical tree in an immersive 3D viewer without logging in. Living
+descendants who wish to connect their branch to the sultan line register,
+request edit access, and — after a super-admin approves them — may add
+persons and relationships in a private studio.
 
-The product is aimed at individuals and small groups (a family) who want to
-preserve their family history on infrastructure they control — not a social
-network or a genealogy research platform.
+This is **not** a multi-tenant genealogy SaaS. There is exactly **one**
+canonical family tree for the whole site.
 
 ## 2. Goals
 
-- Simple, modern UX for building and browsing family trees.
-- Multi-user: accounts, shared families with per-family permissions.
-- Data ownership: self-hosted, exportable data, no third-party services.
-- Production quality: secure auth, backups, migrations, observability.
-- AI-maintainable: documentation-first repo so any AI/dev session can
-  continue the work without prior conversation context.
+- Public, beautiful exploration of the Aceh royal family tree (3D + motion).
+- Controlled contribution: only approved editors (and super-admins) mutate data.
+- Data ownership: self-hosted, no third-party services for core features.
+- Production quality: secure auth for editors, migrations, observability.
+- AI-maintainable: documentation-first repo so any session can continue work.
 
 ### Non-goals (explicitly out of scope)
 
-- Social features (feeds, comments, likes), DNA/records integrations,
-  billing/subscriptions, mobile native apps, multi-tenant SaaS hosting.
+- Multi-family creation / collaborator invite-by-email product UX.
+- Social features (feeds, comments, likes), DNA integrations, billing,
+  mobile native apps, multi-tenant SaaS hosting.
+- Email delivery for access requests or password reset (in-app admin queue /
+  out-of-band reset tokens for now; see ADR-0009).
 
 ## 3. Domain glossary (use these terms precisely)
 
 | Term | Meaning |
 |------|---------|
-| **User** | An account that can log in. Has a global role: `admin` or `user`. |
-| **Family** | A container for one family tree. Created and owned by a user. |
-| **Collaborator** | A user granted access to a family with a per-family role: `owner`, `editor` or `viewer`. The creator is automatically `owner`. |
-| **Person** | A node in a family tree (a family member). Persons are data records, NOT user accounts. A person belongs to exactly one family. |
-| **Relationship** | A typed edge between two persons in the same family: `parent` (directed: from parent → to child) or `spouse` (undirected, stored once in canonical order). |
-| **Tree** | The rendered graph of persons + relationships of a family. |
+| **User** | An account that can log in. Global role: `admin` (super-admin) or `user`. |
+| **Super-admin** | Global role `admin`. Seeded from env. Approves edit-access requests and may edit the tree. |
+| **Royal family** | The single seeded family container (default name: *Kesultanan Aceh*). |
+| **Editor grant** | A `family_collaborators` row with role `editor` (or `owner` for the bootstrap admin) on the royal family. |
+| **Access request** | A registered user asking for editor rights; status `pending` / `approved` / `rejected`. |
+| **Person** | A node in the royal tree (a family member). Pure data — not a login. |
+| **Relationship** | Typed edge: `parent` (from parent → to child) or `spouse` (canonical order). |
+| **Tree** | The rendered graph of persons + relationships of the royal family. |
 
-The distinction **User ≠ Person** is fundamental: deleting a user never
-deletes persons; persons have no login.
+The distinction **User ≠ Person** remains fundamental.
 
 ## 4. Features
 
 | # | Feature | Status | Phase |
 |---|---------|--------|-------|
 | 1 | Authentication (register, login, refresh, logout) | ✅ Implemented | 1 |
-| 2 | User profile (`/users/me` view + edit) | ✅ Implemented | 1 |
+| 2 | User profile (`/users/me`) | ✅ Implemented | 1 |
 | 3 | Global roles (admin/user) + RBAC middleware | ✅ Implemented | 1 |
-| 4 | Create/manage families | 🔲 Planned | 2 |
-| 5 | Share family with collaborators (owner/editor/viewer) | 🔲 Planned | 2 |
-| 6 | Add/edit family members (persons) | 🔲 Planned | 3 |
-| 7 | Define & edit relationships (parent, spouse) | 🔲 Planned | 3 |
-| 8 | Interactive family tree view | 🔲 Planned | 3 |
-| 9 | View ancestors / descendants of a person | 🔲 Planned | 3 |
-| 10 | Profile picture upload for persons | 🔲 Planned | 4 |
-| 11 | Search family members | 🔲 Planned | 4 |
-| 12 | Export family tree (JSON; GEDCOM later) | 🔲 Planned | 5 |
-| 13 | Import family tree (JSON; GEDCOM later) | 🔲 Planned | 5 |
-| 14 | Admin user management UI | 🔲 Planned | 6 |
+| 4 | Singleton royal family (seeded) + public read APIs | ✅ Implemented | R |
+| 5 | Edit-access requests + super-admin approve/reject | ✅ Implemented | R |
+| 6 | Studio: add/edit persons & relationships (editors) | ✅ Implemented | R |
+| 7 | Public 3D tree explorer | ✅ Implemented | R |
+| 8 | Ancestors / descendants (API + UI) | ✅ Implemented | 3 |
+| 9 | Profile picture upload for persons | ✅ Implemented | 4 |
+| 10 | Search family members | ✅ Implemented | 4 |
+| 11 | Export / import (JSON) | ✅ Implemented | 5 |
+| 12 | Admin user management + password reset (no SMTP) | ✅ Implemented | 6 |
+| 13 | Hardening (CSP, E2E smoke, backup/health scripts) | ✅ Implemented | 7 |
 
-The database schema for features 4–9 already exists (see `docs/DATABASE.md`);
-API contracts for them are drafted in `docs/api/planned.md`.
+Legacy multi-family CRUD / collaborator-invite UX is **retired** as a product
+surface (schema retained for the singleton).
 
 ## 5. Constraints
 
 **Technical**
 - Fixed stack: Go/Gin/GORM/PostgreSQL backend, Next.js/TypeScript frontend
   (see `AGENTS.md`). Deviations require an ADR.
-- Deployment target: a single Linux VM running Docker Compose behind Nginx.
-  No managed cloud services; no Kubernetes.
-- Uploaded images are stored on a Docker volume on the VM (S3-compatible
-  storage is a possible future ADR).
-- All configuration via environment variables; secrets are never committed.
+- 3D viewer uses React Three Fiber (ADR-0007).
+- Deployment: single Linux VM, Docker Compose, Nginx.
+- All configuration via environment variables; secrets never committed.
 
 **Non-functional**
-- Expected scale: hundreds of users, families with up to ~2,000 persons.
-  Optimize for correctness and maintainability first; recursive CTEs and
-  proper indexes cover this scale comfortably.
-- Availability: single node; brief downtime during deploys is acceptable.
-- Security: OWASP-conscious auth (short-lived JWT access tokens, rotating
-  httpOnly refresh cookies, bcrypt, rate limiting at the proxy).
+- Expected scale: one tree with up to ~2,000 persons; hundreds of users.
+- Security: public reads; mutations require JWT + editor/admin; refresh
+  cookies httpOnly; rate limiting at the proxy.
 
 ## 6. User flows
 
-**Onboarding**
-1. Visitor opens the landing page → registers with name/email/password.
-2. Registration logs the user in (access token + refresh cookie) and
-   redirects to the dashboard.
+**Public exploration**
+1. Visitor opens the landing page → taps Explore → immersive 3D tree.
+2. Click a person → detail panel (bio, dates, ancestors/descendants).
 
-**Create a family & build a tree** *(Phases 2–3)*
-1. User creates a family (name, description) → becomes its `owner`.
-2. User adds persons (name, gender, birth/death dates, bio, photo).
-3. User connects persons: select person → add relationship (parent/spouse).
-4. Tree view renders the family; user can pan/zoom, focus a person, and view
-   their ancestors or descendants.
+**Descendant contribution**
+1. Register / login → submit an access request (message describing the branch).
+2. Super-admin reviews in `/admin/requests` → approve or reject.
+3. On approve, user gains editor grant → uses `/studio` to add living
+   descendants and link them toward the sultan line.
 
-**Collaboration** *(Phase 2)*
-1. Owner invites an existing user by email to a family with a role.
-2. `editor` can modify persons/relationships; `viewer` is read-only;
-   `owner` can also manage collaborators and delete the family.
-
-**Export / import** *(Phase 5)*
-1. Owner exports a family as JSON (all persons + relationships + metadata).
-2. Import creates a new family from a previously exported file, validating
-   the payload and remapping IDs.
-
-**Administration** *(Phase 6)*
-1. `admin` users can list/deactivate users and change global roles via the
-   admin UI. Bootstrap admin is created from env on first startup.
+**Super-admin**
+1. Bootstrap admin from `ADMIN_EMAIL` / `ADMIN_PASSWORD` on first startup.
+2. Approves requests; may edit the tree like an editor (owner of the seeded family).
+3. Manages accounts at `/admin/users` (role, email-verified flag, soft-delete,
+   issue password-reset tokens to share out-of-band — no SMTP yet).
 
 ## 7. Roadmap
 
 | Phase | Deliverable | Status |
 |-------|-------------|--------|
-| 1 | Foundation: monorepo, docs, Docker, CI/CD, DB schema, auth slice, frontend shell | ✅ Done |
-| 2 | Families CRUD + collaborators (API + UI) | Next |
-| 3 | Persons + relationships CRUD, interactive tree, ancestors/descendants | |
-| 4 | Photo uploads (persons), member search | |
-| 5 | Export/import JSON; GEDCOM evaluation | |
-| 6 | Admin UI, email verification/password reset, notification polish | |
-| 7 | Hardening: integration/E2E tests, CSP, backups automation, monitoring | |
+| 1 | Foundation: monorepo, docs, Docker, CI/CD, DB schema, auth | ✅ Done |
+| 2–3 | Families/persons/tree (internal building blocks) | ✅ Done |
+| **R** | **Product pivot: public Aceh tree, access requests, 3D explore, studio** | ✅ Done |
+| 4 | Photo uploads, member search (pg_trgm) | ✅ Done |
+| 5 | Export/import JSON (GEDCOM deferred, ADR-0008) | ✅ Done |
+| 6 | Broader admin UI, email verification/password reset (ADR-0009) | ✅ Done |
+| 7 | Hardening: E2E smoke, CSP, backups script, health monitoring | ✅ Done |
 
-When a phase is completed: update the table above, the feature table in §4,
-and the Status section in `AGENTS.md`.
+When a phase is completed: update this table, §4, and `AGENTS.md` status.

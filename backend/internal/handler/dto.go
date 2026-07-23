@@ -33,11 +33,23 @@ type UpdateMeRequest struct {
 
 // UserResponse is the public representation of a user account.
 type UserResponse struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Role      string    `json:"role"`
-	CreatedAt time.Time `json:"created_at"`
+	ID            string     `json:"id"`
+	Name          string     `json:"name"`
+	Email         string     `json:"email"`
+	Role          string     `json:"role"`
+	EmailVerified bool       `json:"email_verified"`
+	CreatedAt     time.Time  `json:"created_at"`
+}
+
+func toUserResponse(u *domain.User) UserResponse {
+	return UserResponse{
+		ID:            u.ID.String(),
+		Name:          u.Name,
+		Email:         u.Email,
+		Role:          string(u.Role),
+		EmailVerified: u.EmailVerified(),
+		CreatedAt:     u.CreatedAt,
+	}
 }
 
 // AuthResponse is returned by register/login/refresh. The refresh token is
@@ -47,18 +59,6 @@ type AuthResponse struct {
 	TokenType   string       `json:"token_type"`
 	ExpiresIn   int64        `json:"expires_in"` // seconds until access token expiry
 	User        UserResponse `json:"user"`
-}
-
-// ---- Mappers ---------------------------------------------------------------
-
-func toUserResponse(u *domain.User) UserResponse {
-	return UserResponse{
-		ID:        u.ID.String(),
-		Name:      u.Name,
-		Email:     u.Email,
-		Role:      string(u.Role),
-		CreatedAt: u.CreatedAt,
-	}
 }
 
 func toAuthResponse(r *domain.AuthResult) AuthResponse {

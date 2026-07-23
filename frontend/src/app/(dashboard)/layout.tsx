@@ -24,16 +24,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   if (isPending || isError || !user) {
     return (
-      <div className="grid min-h-dvh place-items-center">
-        <Spinner className="size-8 text-emerald-600" />
+      <div className="aceh-shell grid min-h-dvh place-items-center">
+        <Spinner className="size-10 text-teal-700" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-dvh">
+    <div className="aceh-shell">
       <Header />
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6">{children}</main>
+      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">{children}</main>
     </div>
   );
 }

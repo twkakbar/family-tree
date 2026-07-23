@@ -44,3 +44,35 @@ type FamilyCollaborator struct {
 func (c *FamilyCollaborator) CanEdit() bool {
 	return c.Role == FamilyRoleOwner || c.Role == FamilyRoleEditor
 }
+
+var familyRoleRank = map[FamilyRole]int{
+	FamilyRoleOwner:  3,
+	FamilyRoleEditor: 2,
+	FamilyRoleViewer: 1,
+}
+
+// Valid reports whether the role is one of the supported family roles.
+func (r FamilyRole) Valid() bool {
+	_, ok := familyRoleRank[r]
+	return ok
+}
+
+// AtLeast reports whether r meets or exceeds the minimum required role.
+func (r FamilyRole) AtLeast(min FamilyRole) bool {
+	return familyRoleRank[r] >= familyRoleRank[min]
+}
+
+// FamilySummary is a family visible to a collaborator, including their role
+// and a denormalized persons count for list/detail views.
+type FamilySummary struct {
+	Family       Family
+	Role         FamilyRole
+	PersonsCount int64
+}
+
+// CollaboratorSummary joins a collaborator grant with the invited user's
+// public profile fields.
+type CollaboratorSummary struct {
+	Collaborator FamilyCollaborator
+	User         User
+}

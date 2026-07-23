@@ -22,15 +22,18 @@ import (
 type authService struct {
 	users           domain.UserRepository
 	refreshTokens   domain.RefreshTokenRepository
+	passwordResets  domain.PasswordResetTokenRepository
 	jwt             *token.JWTManager
 	hasher          *password.Hasher
 	refreshTokenTTL time.Duration
+	resetTokenTTL   time.Duration
 }
 
 // NewAuthService wires the authentication business logic.
 func NewAuthService(
 	users domain.UserRepository,
 	refreshTokens domain.RefreshTokenRepository,
+	passwordResets domain.PasswordResetTokenRepository,
 	jwt *token.JWTManager,
 	hasher *password.Hasher,
 	refreshTokenTTL time.Duration,
@@ -38,9 +41,11 @@ func NewAuthService(
 	return &authService{
 		users:           users,
 		refreshTokens:   refreshTokens,
+		passwordResets:  passwordResets,
 		jwt:             jwt,
 		hasher:          hasher,
 		refreshTokenTTL: refreshTokenTTL,
+		resetTokenTTL:   time.Hour,
 	}
 }
 
@@ -53,12 +58,16 @@ func (s *authService) Register(ctx context.Context, in domain.RegisterInput) (*d
 		return nil, fmt.Errorf("register: %w", err)
 	}
 
+	now := time.Now().UTC()
 	user := &domain.User{
-		ID:           uuid.New(),
-		Name:         strings.TrimSpace(in.Name),
-		Email:        email,
-		PasswordHash: hash,
-		Role:         domain.RoleUser,
+		ID:              uuid.New(),
+		Name:            strings.TrimSpace(in.Name),
+		Email:           email,
+		PasswordHash:    hash,
+		Role:            domain.RoleUser,
+		EmailVerifiedAt: &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	// The partial unique index on email is the authoritative duplicate check;
 	// the repository translates violations into domain.ErrEmailTaken.
@@ -171,17 +180,88 @@ func (s *authService) EnsureAdmin(ctx context.Context, name, email, pass string)
 	if err != nil {
 		return fmt.Errorf("ensure admin: %w", err)
 	}
+	now := time.Now().UTC()
 	admin := &domain.User{
-		ID:           uuid.New(),
-		Name:         name,
-		Email:        email,
-		PasswordHash: hash,
-		Role:         domain.RoleAdmin,
+		ID:              uuid.New(),
+		Name:            name,
+		Email:           email,
+		PasswordHash:    hash,
+		Role:            domain.RoleAdmin,
+		EmailVerifiedAt: &now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	if err := s.users.Create(ctx, admin); err != nil {
 		return err
 	}
 	slog.Info("bootstrap admin account created", "email", email)
+	return nil
+}
+
+func (s *authService) RequestPasswordReset(ctx context.Context, email string) (string, error) {
+	user, err := s.users.GetByEmail(ctx, NormalizeEmail(email))
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return "", nil
+		}
+		return "", err
+	}
+
+	if err := s.passwordResets.RevokeAllForUser(ctx, user.ID); err != nil {
+		return "", err
+	}
+
+	raw, err := token.NewOpaque()
+	if err != nil {
+		return "", err
+	}
+	now := time.Now().UTC()
+	record := &domain.PasswordResetToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		TokenHash: token.HashOpaque(raw),
+		ExpiresAt: now.Add(s.resetTokenTTL),
+		CreatedAt: now,
+	}
+	if err := s.passwordResets.Create(ctx, record); err != nil {
+		return "", err
+	}
+	return raw, nil
+}
+
+func (s *authService) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+	if strings.TrimSpace(rawToken) == "" || strings.TrimSpace(newPassword) == "" {
+		return domain.ErrTokenInvalid
+	}
+
+	stored, err := s.passwordResets.GetByHash(ctx, token.HashOpaque(rawToken))
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrTokenInvalid
+		}
+		return err
+	}
+	now := time.Now().UTC()
+	if !stored.Valid(now) {
+		return domain.ErrTokenExpired
+	}
+
+	user, err := s.users.GetByID(ctx, stored.UserID)
+	if err != nil {
+		return err
+	}
+	hash, err := s.hasher.Hash(newPassword)
+	if err != nil {
+		return fmt.Errorf("reset password: %w", err)
+	}
+	user.PasswordHash = hash
+	user.UpdatedAt = now
+	if err := s.users.Update(ctx, user); err != nil {
+		return err
+	}
+	_ = s.passwordResets.Revoke(ctx, stored.ID)
+	_ = s.passwordResets.RevokeAllForUser(ctx, user.ID)
+	_ = s.refreshTokens.RevokeAllForUser(ctx, user.ID)
 	return nil
 }
 

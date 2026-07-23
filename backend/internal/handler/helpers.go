@@ -104,6 +104,22 @@ func respondError(c *gin.Context, err error) {
 		response.Error(c, http.StatusUnauthorized, codeUnauthorized, "authentication required")
 	case errors.Is(err, domain.ErrForbidden):
 		response.Error(c, http.StatusForbidden, codeForbidden, "permission denied")
+	case errors.Is(err, domain.ErrAlreadyCollaborator):
+		response.Error(c, http.StatusConflict, codeConflict, "user is already a collaborator")
+	case errors.Is(err, domain.ErrLastOwner):
+		response.Error(c, http.StatusConflict, codeConflict, "family must retain at least one owner")
+	case errors.Is(err, domain.ErrInvalidRelationship):
+		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "invalid relationship or person data")
+	case errors.Is(err, domain.ErrRelationshipExists):
+		response.Error(c, http.StatusConflict, codeConflict, "relationship already exists")
+	case errors.Is(err, domain.ErrAccessRequestPending):
+		response.Error(c, http.StatusConflict, codeConflict, "access request already pending")
+	case errors.Is(err, domain.ErrAlreadyEditor):
+		response.Error(c, http.StatusConflict, codeConflict, "user already has edit access")
+	case errors.Is(err, domain.ErrInvalidUpload):
+		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "invalid photo upload (use JPEG, PNG, or WebP within size limit)")
+	case errors.Is(err, domain.ErrUnsupportedFormat):
+		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "unsupported or invalid tree transfer document")
 	default:
 		slog.Error("unhandled error",
 			"error", err,

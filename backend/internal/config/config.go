@@ -32,6 +32,7 @@ type Config struct {
 	CORS           CORSConfig
 	Upload         UploadConfig
 	Admin          AdminBootstrap
+	RoyalFamily    RoyalFamilyConfig
 	RunMigrations  bool
 	TrustedProxies []string
 }
@@ -98,6 +99,12 @@ type AdminBootstrap struct {
 // Enabled reports whether bootstrap credentials are configured.
 func (a AdminBootstrap) Enabled() bool { return a.Email != "" && a.Password != "" }
 
+// RoyalFamilyConfig names the singleton public family seeded at startup.
+type RoyalFamilyConfig struct {
+	Name        string
+	Description string
+}
+
 // Load reads configuration from the environment. In non-production it first
 // loads a local .env file when present (developer convenience; production
 // containers receive real environment variables from compose).
@@ -142,6 +149,10 @@ func Load() (*Config, error) {
 			Email:    getEnv("ADMIN_EMAIL", ""),
 			Password: getEnv("ADMIN_PASSWORD", ""),
 			Name:     getEnv("ADMIN_NAME", "Administrator"),
+		},
+		RoyalFamily: RoyalFamilyConfig{
+			Name:        getEnv("ROYAL_FAMILY_NAME", "Kesultanan Aceh"),
+			Description: getEnv("ROYAL_FAMILY_DESCRIPTION", "Silsilah keluarga kerajaan Aceh untuk dijelajahi publik."),
 		},
 		RunMigrations:  getEnvBool("RUN_MIGRATIONS", true),
 		TrustedProxies: splitNonEmpty(getEnv("TRUSTED_PROXIES", "")),

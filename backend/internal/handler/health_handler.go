@@ -30,8 +30,11 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 		err = sqlDB.PingContext(c.Request.Context())
 	}
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unavailable"})
+		c.JSON(http.StatusServiceUnavailable, gin.H{
+			"status":  "unavailable",
+			"version": h.version,
+		})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	c.JSON(http.StatusOK, gin.H{"status": "ok", "version": h.version})
 }

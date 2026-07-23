@@ -16,9 +16,15 @@ import (
 
 // Handlers aggregates all HTTP handlers for route registration.
 type Handlers struct {
-	Auth   *handler.AuthHandler
-	Users  *handler.UserHandler
-	Health *handler.HealthHandler
+	Auth           *handler.AuthHandler
+	Users          *handler.UserHandler
+	Families       *handler.FamilyHandler
+	Persons        *handler.PersonHandler
+	Public         *handler.PublicHandler
+	AccessRequests *handler.AccessRequestHandler
+	Transfer       *handler.TransferHandler
+	AdminUsers     *handler.AdminUserHandler
+	Health         *handler.HealthHandler
 }
 
 // New builds the fully configured Gin engine.
@@ -28,7 +34,6 @@ func New(cfg *config.Config, jwt *token.JWTManager, h Handlers) *gin.Engine {
 	}
 
 	r := gin.New()
-	// Client IPs come from nginx's X-Forwarded-For; only trust configured proxies.
 	_ = r.SetTrustedProxies(cfg.TrustedProxies)
 
 	r.Use(
@@ -40,12 +45,8 @@ func New(cfg *config.Config, jwt *token.JWTManager, h Handlers) *gin.Engine {
 		middleware.CORS(cfg.CORS.AllowedOrigins),
 	)
 
-	// Probes (unversioned; used by container healthchecks).
 	r.GET("/healthz", h.Health.Live)
 	r.GET("/readyz", h.Health.Ready)
-
-	// Uploaded files. In production nginx serves this path from the shared
-	// volume; this route covers development and direct API access.
 	r.Static("/uploads", cfg.Upload.Dir)
 
 	v1 := r.Group("/api/v1")
@@ -56,6 +57,17 @@ func New(cfg *config.Config, jwt *token.JWTManager, h Handlers) *gin.Engine {
 			auth.POST("/login", h.Auth.Login)
 			auth.POST("/refresh", h.Auth.Refresh)
 			auth.POST("/logout", h.Auth.Logout)
+			auth.POST("/forgot-password", h.Auth.ForgotPassword)
+			auth.POST("/reset-password", h.Auth.ResetPassword)
+		}
+
+		public := v1.Group("/public")
+		{
+			public.GET("/meta", h.Public.GetMeta)
+			public.GET("/tree", h.Public.GetTree)
+			public.GET("/persons/:id", h.Public.GetPerson)
+			public.GET("/persons/:id/ancestors", h.Public.GetAncestors)
+			public.GET("/persons/:id/descendants", h.Public.GetDescendants)
 		}
 
 		users := v1.Group("/users", middleware.RequireAuth(jwt))
@@ -64,8 +76,55 @@ func New(cfg *config.Config, jwt *token.JWTManager, h Handlers) *gin.Engine {
 			users.PATCH("/me", h.Users.UpdateMe)
 		}
 
-		// Admin-only namespace (user management endpoints land in Phase 6).
-		_ = v1.Group("/admin", middleware.RequireAuth(jwt), middleware.RequireRole("admin"))
+		access := v1.Group("/access-requests", middleware.RequireAuth(jwt))
+		{
+			access.POST("", h.AccessRequests.Submit)
+			access.GET("/me", h.AccessRequests.MyLatest)
+		}
+
+		studio := v1.Group("/studio", middleware.RequireAuth(jwt))
+		{
+			studio.GET("/can-edit", h.AccessRequests.CanEdit)
+		}
+
+		// Authenticated mutations still use family/person routes (studio UI
+		// resolves the royal family id via /studio/can-edit).
+		families := v1.Group("/families", middleware.RequireAuth(jwt))
+		{
+			families.GET("/:id", h.Families.GetFamily)
+			families.GET("/:id/export", h.Transfer.ExportFamily)
+			families.POST("/:id/import", h.Transfer.ImportFamily)
+			families.GET("/:id/persons", h.Persons.ListPersons)
+			families.POST("/:id/persons", h.Persons.CreatePerson)
+			families.GET("/:id/tree", h.Persons.GetFamilyTree)
+			families.POST("/:id/relationships", h.Persons.CreateRelationship)
+		}
+
+		persons := v1.Group("/persons", middleware.RequireAuth(jwt))
+		{
+			persons.GET("/:id", h.Persons.GetPerson)
+			persons.PATCH("/:id", h.Persons.UpdatePerson)
+			persons.PUT("/:id/photo", h.Persons.UploadPhoto)
+			persons.DELETE("/:id", h.Persons.DeletePerson)
+			persons.GET("/:id/ancestors", h.Persons.GetAncestors)
+			persons.GET("/:id/descendants", h.Persons.GetDescendants)
+		}
+
+		relationships := v1.Group("/relationships", middleware.RequireAuth(jwt))
+		{
+			relationships.DELETE("/:id", h.Persons.DeleteRelationship)
+		}
+
+		admin := v1.Group("/admin", middleware.RequireAuth(jwt), middleware.RequireRole("admin"))
+		{
+			admin.GET("/access-requests", h.AccessRequests.ListPending)
+			admin.POST("/access-requests/:id/approve", h.AccessRequests.Approve)
+			admin.POST("/access-requests/:id/reject", h.AccessRequests.Reject)
+			admin.GET("/users", h.AdminUsers.ListUsers)
+			admin.PATCH("/users/:id", h.AdminUsers.UpdateUser)
+			admin.DELETE("/users/:id", h.AdminUsers.DeleteUser)
+			admin.POST("/users/:id/password-reset", h.AdminUsers.IssuePasswordReset)
+		}
 	}
 
 	r.NoRoute(func(c *gin.Context) {

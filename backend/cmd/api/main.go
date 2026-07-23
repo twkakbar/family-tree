@@ -67,12 +67,28 @@ func run() error {
 	// --- Dependency wiring (constructor injection, innermost first) ---
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
+	passwordResetRepo := repository.NewPasswordResetTokenRepository(db)
+	familyRepo := repository.NewFamilyRepository(db)
+	collaboratorRepo := repository.NewFamilyCollaboratorRepository(db)
+	personRepo := repository.NewPersonRepository(db)
+	relationshipRepo := repository.NewRelationshipRepository(db)
+	accessRequestRepo := repository.NewEditAccessRequestRepository(db)
 
 	jwtManager := token.NewJWTManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
 	hasher := password.NewHasher(cfg.Auth.BcryptCost)
 
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, jwtManager, hasher, cfg.Auth.RefreshTokenTTL)
+	authService := service.NewAuthService(userRepo, refreshTokenRepo, passwordResetRepo, jwtManager, hasher, cfg.Auth.RefreshTokenTTL)
 	userService := service.NewUserService(userRepo)
+	familyService := service.NewFamilyService(familyRepo, collaboratorRepo, userRepo)
+	personService := service.NewPersonService(
+		familyRepo, personRepo, relationshipRepo, userRepo,
+		cfg.Upload.Dir, cfg.Upload.MaxUploadMB*1024*1024,
+	)
+	royalService := service.NewRoyalFamilyService(familyRepo, collaboratorRepo, userRepo, cfg.RoyalFamily.Name)
+	publicService := service.NewPublicTreeService(royalService, personRepo, relationshipRepo)
+	accessService := service.NewAccessRequestService(accessRequestRepo, userRepo, royalService, collaboratorRepo)
+	transferService := service.NewTransferService(familyService, personService)
+	adminUserService := service.NewAdminUserService(userRepo, refreshTokenRepo, passwordResetRepo)
 
 	if cfg.Admin.Enabled() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -80,13 +96,32 @@ func run() error {
 			cancel()
 			return fmt.Errorf("bootstrapping admin: %w", err)
 		}
+		adminUser, err := userRepo.GetByEmail(ctx, cfg.Admin.Email)
+		if err != nil {
+			cancel()
+			return fmt.Errorf("loading bootstrap admin: %w", err)
+		}
+		if _, err := royalService.Ensure(ctx, adminUser.ID, cfg.RoyalFamily.Name, cfg.RoyalFamily.Description); err != nil {
+			cancel()
+			return fmt.Errorf("seeding royal family: %w", err)
+		}
 		cancel()
+	} else {
+		// Still try to resolve an existing royal family for public reads when
+		// admin bootstrap is not configured (e.g. already seeded DB).
+		slog.Info("ADMIN_EMAIL/PASSWORD not set; skipping admin + royal family seed")
 	}
 
 	router := routes.New(cfg, jwtManager, routes.Handlers{
-		Auth:   handler.NewAuthHandler(authService, cfg.Auth),
-		Users:  handler.NewUserHandler(userService),
-		Health: handler.NewHealthHandler(db, version),
+		Auth:           handler.NewAuthHandler(authService, cfg.Auth, !cfg.IsProduction()),
+		Users:          handler.NewUserHandler(userService),
+		Families:       handler.NewFamilyHandler(familyService),
+		Persons:        handler.NewPersonHandler(personService),
+		Public:         handler.NewPublicHandler(publicService),
+		AccessRequests: handler.NewAccessRequestHandler(accessService, royalService),
+		Transfer:       handler.NewTransferHandler(transferService),
+		AdminUsers:     handler.NewAdminUserHandler(adminUserService),
+		Health:         handler.NewHealthHandler(db, version),
 	})
 
 	srv := &http.Server{

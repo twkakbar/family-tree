@@ -70,6 +70,37 @@ func (r *userRepository) Update(ctx context.Context, user *domain.User) error {
 	return nil
 }
 
+func (r *userRepository) List(ctx context.Context, search string, offset, limit int) ([]domain.User, int64, error) {
+	q := r.db.WithContext(ctx).Model(&domain.User{})
+	if search != "" {
+		pattern := "%" + search + "%"
+		q = q.Where("name ILIKE ? OR email ILIKE ?", pattern, pattern)
+	}
+
+	var total int64
+	if err := q.Session(&gorm.Session{}).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("counting users: %w", err)
+	}
+
+	var users []domain.User
+	err := q.Order("created_at DESC").Offset(offset).Limit(limit).Find(&users).Error
+	if err != nil {
+		return nil, 0, fmt.Errorf("listing users: %w", err)
+	}
+	return users, total, nil
+}
+
+func (r *userRepository) SoftDelete(ctx context.Context, id uuid.UUID) error {
+	res := r.db.WithContext(ctx).Delete(&domain.User{}, "id = ?", id)
+	if res.Error != nil {
+		return fmt.Errorf("soft deleting user: %w", res.Error)
+	}
+	if res.RowsAffected == 0 {
+		return domain.ErrNotFound
+	}
+	return nil
+}
+
 // isUniqueViolation reports whether err is a PostgreSQL 23505 error.
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
