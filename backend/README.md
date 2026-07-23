@@ -1,9 +1,10 @@
 # backend/
 
-Go API for Family Tree. Gin + GORM + PostgreSQL, Clean Architecture.
-Read `../ARCHITECTURE.md` §2–§3 and `../DEVELOPMENT_RULES.md` §3 before
-changing code. The **auth slice is the reference implementation** — copy its
-structure for new features.
+Go API for the **Kesultanan Aceh** family tree. Gin + GORM + PostgreSQL,
+Clean Architecture. Read `../ARCHITECTURE.md` §2–§3 and
+`../DEVELOPMENT_RULES.md` §3 before changing code. The **auth slice** and
+later feature services (persons, public tree, access requests, admin) are
+the reference patterns — copy their structure for new features.
 
 ## Layout
 
@@ -18,7 +19,7 @@ internal/middleware/  request-id, logging, recovery, CORS, auth (JWT), RBAC
 internal/routes/      route registration
 internal/config/      env-based configuration (the only env reader)
 internal/validation/  custom validator tags (strong_password)
-pkg/                  reusable: token, password, response, pagination
+pkg/                  reusable: token, password, response, pagination, upload
 migrations/           embedded SQL migrations (golang-migrate)
 ```
 
