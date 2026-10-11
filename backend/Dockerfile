@@ -30,11 +30,13 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath \
 
 # --- Runtime ---------------------------------------------------
 FROM alpine:3.20 AS runtime
-RUN apk add --no-cache ca-certificates tzdata \
+RUN apk add --no-cache ca-certificates tzdata su-exec \
     && addgroup -S app && adduser -S -G app app \
     && mkdir -p /app/uploads && chown -R app:app /app
 WORKDIR /app
 COPY --from=build /out/api /out/migrate ./
-USER app
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 EXPOSE 8080
-ENTRYPOINT ["/app/api"]
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["/app/api"]

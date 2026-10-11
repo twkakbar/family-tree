@@ -39,11 +39,11 @@ func Save(dir, relativePath string, data []byte) error {
 		return fmt.Errorf("invalid relative path")
 	}
 	full := filepath.Join(dir, rel)
-	if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+	if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
 		return fmt.Errorf("mkdir: %w", err)
 	}
 	tmp := full + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o640); err != nil {
+	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return fmt.Errorf("write temp: %w", err)
 	}
 	if err := os.Rename(tmp, full); err != nil {
