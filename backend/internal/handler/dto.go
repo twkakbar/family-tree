@@ -33,12 +33,12 @@ type UpdateMeRequest struct {
 
 // UserResponse is the public representation of a user account.
 type UserResponse struct {
-	ID            string     `json:"id"`
-	Name          string     `json:"name"`
-	Email         string     `json:"email"`
-	Role          string     `json:"role"`
-	EmailVerified bool       `json:"email_verified"`
-	CreatedAt     time.Time  `json:"created_at"`
+	ID            string    `json:"id"`
+	Name          string    `json:"name"`
+	Email         string    `json:"email"`
+	Role          string    `json:"role"`
+	EmailVerified bool      `json:"email_verified"`
+	CreatedAt     time.Time `json:"created_at"`
 }
 
 func toUserResponse(u *domain.User) UserResponse {

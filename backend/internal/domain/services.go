@@ -174,9 +174,9 @@ type TransferService interface {
 
 // AdminUpdateUserInput is the admin patch for an account.
 type AdminUpdateUserInput struct {
-	Name            *string
-	Role            *Role
-	EmailVerified   *bool
+	Name          *string
+	Role          *Role
+	EmailVerified *bool
 }
 
 // AdminUserService is super-admin account management.
