@@ -1,6 +1,6 @@
 "use client";
 
-import { Billboard, Float, GradientTexture, Html, Line, OrbitControls } from "@react-three/drei";
+import { Billboard, GradientTexture, Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
@@ -18,9 +18,12 @@ interface RoyalTreeCanvasProps {
 
 const GOLD = "#d4af37";
 const GOLD_BRIGHT = "#f0c75e";
-const SEA_DEEP = "#0a3d42";
 const SEA_FACE = "#124a50";
 const INK = "#04151a";
+/** Outer gold edge. Lines stop here so they do not cut through the portrait. */
+const MEDALLION_RADIUS = 0.36;
+/** Face sits inside the ring (tube center 0.3, tube radius 0.035). */
+const FACE_RADIUS = 0.255;
 
 function PersonNode({
   node,
@@ -37,9 +40,8 @@ function PersonNode({
   const rimColor = selected ? GOLD_BRIGHT : GOLD;
 
   return (
-    <Float speed={0.6} rotationIntensity={0.05} floatIntensity={0.12}>
-      <group position={[node.x, node.y, node.z]}>
-        <Billboard follow>
+    <group position={[node.x, node.y, node.z]}>
+      <Billboard follow>
           <group
             onClick={(e) => {
               e.stopPropagation();
@@ -88,7 +90,7 @@ function PersonNode({
           <NamePlaque name={name} selected={selected} onSelect={onSelect} />
         </Html>
       </group>
-    </Float>
+    </group>
   );
 }
 
@@ -145,44 +147,50 @@ function MedallionFace({
   selected: boolean;
 }) {
   const texture = useCoverTexture(photoUrl);
-
-  if (texture) {
-    return (
-      <mesh>
-        <circleGeometry args={[0.275, 48]} />
-        <meshStandardMaterial
-          map={texture}
-          roughness={0.55}
-          metalness={0.05}
-          emissive={selected ? "#3a2a10" : "#000000"}
-          emissiveIntensity={selected ? 0.15 : 0}
-        />
-      </mesh>
-    );
-  }
+  const initialsTexture = useInitialsTexture(initials, selected);
 
   return (
-    <group>
-      <mesh>
-        <circleGeometry args={[0.275, 48]} />
-        <meshStandardMaterial
-          color={selected ? "#1a5c58" : SEA_FACE}
-          emissive={SEA_DEEP}
-          emissiveIntensity={0.25}
-          metalness={0.35}
-          roughness={0.45}
-        />
-      </mesh>
-      <Html transform distanceFactor={6} position={[0, 0, 0.02]} center zIndexRange={[12, 0]}>
-        <div
-          className="pointer-events-none select-none font-display text-[22px] font-semibold tracking-wide text-amber-100/95"
-          style={{ textShadow: "0 1px 2px rgba(0,0,0,0.55)" }}
-        >
-          {initials}
-        </div>
-      </Html>
-    </group>
+    <mesh>
+      <circleGeometry args={[FACE_RADIUS, 64]} />
+      <meshStandardMaterial
+        map={texture ?? initialsTexture}
+        color={texture ? "#ffffff" : selected ? "#1a5c58" : SEA_FACE}
+        roughness={texture ? 0.55 : 0.45}
+        metalness={texture ? 0.05 : 0.2}
+        emissive={selected ? "#3a2a10" : "#000000"}
+        emissiveIntensity={selected ? 0.12 : 0}
+      />
+    </mesh>
   );
+}
+
+function useInitialsTexture(initials: string, selected: boolean): THREE.CanvasTexture {
+  const texture = useMemo(() => {
+    const size = 256;
+    const canvas = document.createElement("canvas");
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext("2d");
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    if (!ctx) return tex;
+
+    ctx.clearRect(0, 0, size, size);
+    ctx.fillStyle = selected ? "#1a5c58" : "#124a50";
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#f6e6c0";
+    ctx.font = "600 88px Georgia, serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText(initials, size / 2, size / 2 + 2);
+    tex.needsUpdate = true;
+    return tex;
+  }, [initials, selected]);
+
+  useEffect(() => () => texture.dispose(), [texture]);
+  return texture;
 }
 
 /** Loads a portrait texture and crops it like CSS object-fit: cover. */
@@ -259,10 +267,7 @@ function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["r
         const from = findNode3D(nodes, edge.from_person_id);
         const to = findNode3D(nodes, edge.to_person_id);
         if (!from || !to) return null;
-        const points = [
-          new THREE.Vector3(from.x, from.y, from.z),
-          new THREE.Vector3(to.x, to.y, to.z),
-        ];
+        const points = trimmedEnds(from, to, MEDALLION_RADIUS);
         const isSpouse = edge.type === "spouse";
         return (
           <Line
@@ -280,6 +285,20 @@ function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["r
       })}
     </>
   );
+}
+
+/** Pull both ends back so the stroke meets the gold rim, not the portrait. */
+function trimmedEnds(from: Node3D, to: Node3D, radius: number): [THREE.Vector3, THREE.Vector3] {
+  const start = new THREE.Vector3(from.x, from.y, from.z);
+  const end = new THREE.Vector3(to.x, to.y, to.z);
+  const direction = end.clone().sub(start);
+  const length = direction.length();
+  if (length <= radius * 2.2) return [start, end];
+  direction.multiplyScalar(1 / length);
+  return [
+    start.clone().addScaledVector(direction, radius),
+    end.clone().addScaledVector(direction, -radius),
+  ];
 }
 
 /** Soft Aceh sea depth: dusk gold above, deep teal water below. */
