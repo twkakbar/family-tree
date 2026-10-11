@@ -60,6 +60,7 @@ export function FamilyTreeView({
   const [offset, setOffset] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const panRef = useRef({ x: 0, y: 0 });
+  const panningRef = useRef(false);
   const [linkDrag, setLinkDrag] = useState<LinkDragState | null>(null);
   const [pendingLink, setPendingLink] = useState<PendingLink | null>(null);
 
@@ -204,6 +205,7 @@ export function FamilyTreeView({
           ref={containerRef}
           className={cn(
             "relative min-h-[min(22rem,55vh)] h-[min(28rem,62vh)] w-full overflow-hidden bg-[radial-gradient(circle_at_1px_1px,#e2e8f0_1px,transparent_0)] [background-size:20px_20px] sm:min-h-[26rem] sm:h-[32rem]",
+            "touch-none",
             linkDrag ? "cursor-crosshair" : isPanning ? "cursor-grabbing" : "cursor-grab",
           )}
           onWheel={(event) => {
@@ -212,23 +214,31 @@ export function FamilyTreeView({
             setScale((value) => clampScale(value + delta));
           }}
           onPointerDown={(event) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
             if ((event.target as Element).closest("[data-person-node]")) return;
             panRef.current = {
               x: event.clientX - offset.x,
               y: event.clientY - offset.y,
             };
+            panningRef.current = true;
             setIsPanning(true);
-            (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+            event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerMove={(event) => {
-            if (!isPanning || linkDrag) return;
+            if (!panningRef.current || linkDrag) return;
             setOffset({
               x: event.clientX - panRef.current.x,
               y: event.clientY - panRef.current.y,
             });
           }}
-          onPointerUp={() => setIsPanning(false)}
-          onPointerLeave={() => setIsPanning(false)}
+          onPointerUp={() => {
+            panningRef.current = false;
+            setIsPanning(false);
+          }}
+          onPointerCancel={() => {
+            panningRef.current = false;
+            setIsPanning(false);
+          }}
         >
           <div
             className="absolute left-0 top-0 origin-top-left will-change-transform"
