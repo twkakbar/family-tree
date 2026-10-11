@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -70,6 +70,7 @@ export function PersonDetailPanel({
   const deleteRelationship = useDeleteRelationship(family.id);
   const uploadPhoto = useUploadPersonPhoto(family.id);
   const fileRef = useRef<HTMLInputElement>(null);
+  const [saveNotice, setSaveNotice] = useState<"saved" | "invalid" | null>(null);
 
   const canEdit = family.role === "owner" || family.role === "editor";
   const shown = detail.data ?? person;
@@ -78,6 +79,10 @@ export function PersonDetailPanel({
     resolver: zodResolver(editSchema),
     defaultValues: valuesFromPerson(shown),
   });
+
+  useEffect(() => {
+    setSaveNotice(null);
+  }, [person.id]);
 
   useEffect(() => {
     form.reset(valuesFromPerson(detail.data ?? person));
@@ -179,20 +184,28 @@ export function PersonDetailPanel({
         <form
           className="mt-6 space-y-4 border-t border-teal-900/10 pt-5"
           noValidate
-          onSubmit={form.handleSubmit((values) => {
-            updatePerson.mutate(
-              {
-                first_name: values.first_name,
-                gender: values.gender,
-                birth_date: values.birth_date || undefined,
-                death_date: values.death_date || undefined,
-                bio: values.bio || undefined,
-              },
-              {
-                onSuccess: (updated) => onUpdated?.(updated),
-              },
-            );
-          })}
+          onSubmit={form.handleSubmit(
+            (values) => {
+              setSaveNotice(null);
+              updatePerson.mutate(
+                {
+                  first_name: values.first_name,
+                  gender: values.gender,
+                  birth_date: values.birth_date || undefined,
+                  death_date: values.death_date || undefined,
+                  bio: values.bio || undefined,
+                },
+                {
+                  onSuccess: (updated) => {
+                    onUpdated?.(updated);
+                    setSaveNotice("saved");
+                  },
+                  onError: () => setSaveNotice(null),
+                },
+              );
+            },
+            () => setSaveNotice("invalid"),
+          )}
         >
           <h3 className="text-base font-semibold text-slate-900">Edit details</h3>
 
@@ -271,6 +284,16 @@ export function PersonDetailPanel({
               {...form.register("bio")}
             />
           </div>
+
+          {saveNotice === "saved" && !updatePerson.isPending && (
+            <Alert tone="success">Changes saved.</Alert>
+          )}
+          {saveNotice === "invalid" && (
+            <Alert tone="error">Could not save. Check the name and use dates as YYYY-MM-DD.</Alert>
+          )}
+          {updatePerson.error instanceof ApiError && !updatePerson.isPending && (
+            <Alert tone="error">{updatePerson.error.message}</Alert>
+          )}
 
           <Button type="submit" size="lg" className="w-full py-3.5 text-base" loading={updatePerson.isPending}>
             Save changes
