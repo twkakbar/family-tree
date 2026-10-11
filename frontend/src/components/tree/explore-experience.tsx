@@ -29,7 +29,7 @@ export function ExploreExperience() {
 
   return (
     <div className="aceh-sea-bg relative h-dvh w-full overflow-hidden text-teal-50">
-      <header className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-4 p-4 sm:p-6">
+      <header className="pointer-events-none absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 p-3 sm:gap-4 sm:p-6">
         <div className="pointer-events-auto max-w-md rounded-2xl bg-slate-950/55 px-4 py-3 shadow-xl ring-1 ring-teal-500/20 backdrop-blur-md">
           <p className="font-display text-lg tracking-wide text-amber-200 sm:text-xl">
             {meta.data?.name ?? "Kesultanan Aceh"}
@@ -66,7 +66,7 @@ export function ExploreExperience() {
       </div>
 
       {selected && (
-        <aside className="absolute bottom-0 right-0 z-20 m-4 max-h-[min(70vh,28rem)] w-[min(100%-2rem,22rem)] overflow-y-auto rounded-2xl bg-slate-950/80 p-4 shadow-2xl ring-1 ring-teal-400/25 backdrop-blur-md sm:m-6">
+        <aside className="absolute inset-x-0 bottom-0 z-40 max-h-[75dvh] overflow-y-auto rounded-t-3xl bg-[#071c22] p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl ring-1 ring-teal-400/30 sm:inset-x-auto sm:bottom-6 sm:right-6 sm:max-h-[min(70vh,28rem)] sm:w-[22rem] sm:rounded-2xl sm:bg-slate-950/95 sm:pb-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="font-display text-xl text-amber-100">{displayName(selected)}</h2>

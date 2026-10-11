@@ -82,7 +82,7 @@ function PersonNode({
           </group>
         </Billboard>
 
-        <Html distanceFactor={9} position={[0, -0.58, 0]} center>
+        <Html distanceFactor={9} position={[0, -0.58, 0]} center zIndexRange={[12, 0]}>
           <NamePlaque name={name} selected={selected} onSelect={onSelect} />
         </Html>
       </group>
@@ -171,7 +171,7 @@ function MedallionFace({
           roughness={0.45}
         />
       </mesh>
-      <Html transform distanceFactor={6} position={[0, 0, 0.02]} center>
+      <Html transform distanceFactor={6} position={[0, 0, 0.02]} center zIndexRange={[12, 0]}>
         <div
           className="pointer-events-none select-none font-display text-[22px] font-semibold tracking-wide text-amber-100/95"
           style={{ textShadow: "0 1px 2px rgba(0,0,0,0.55)" }}
