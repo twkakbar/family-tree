@@ -68,3 +68,18 @@ var (
 	// ErrRateLimited signals too many verification emails in the current hour.
 	ErrRateLimited = errors.New("too many verification emails")
 )
+
+// RelationshipRuleError is a tree rule the editor broke. It unwraps to
+// ErrInvalidRelationship so handlers keep the 422 status, and Reason is the
+// sentence shown in the studio.
+type RelationshipRuleError struct {
+	Reason string
+}
+
+func (e *RelationshipRuleError) Error() string { return e.Reason }
+
+func (e *RelationshipRuleError) Unwrap() error { return ErrInvalidRelationship }
+
+func RejectRelationship(reason string) error {
+	return &RelationshipRuleError{Reason: reason}
+}

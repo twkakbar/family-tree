@@ -317,6 +317,7 @@ export function FamilyTreeView({
         <RelationshipLinkPicker
           source={pendingLink.source}
           target={pendingLink.target}
+          relationships={tree.data?.relationships ?? []}
           loading={createRelationship.isPending}
           error={pickerError}
           onChoose={handleConfirmLink}

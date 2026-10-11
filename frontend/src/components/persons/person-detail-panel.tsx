@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   useDeletePerson,
   useDeleteRelationship,
+  useFamilyTree,
   usePerson,
   usePersonAncestors,
   usePersonDescendants,
@@ -23,6 +24,7 @@ import {
 import { ApiError } from "@/types/api";
 import type { Family } from "@/types/family";
 import type { Person, PersonWithDepth } from "@/types/person";
+import { relationshipLabel } from "@/utils/relationship-rules";
 import { displayName } from "@/utils/tree-layout";
 
 const editSchema = z.object({
@@ -63,6 +65,7 @@ export function PersonDetailPanel({
 }: PersonDetailPanelProps) {
   const personId = person.id;
   const detail = usePerson(personId);
+  const tree = useFamilyTree(family.id);
   const ancestors = usePersonAncestors(personId);
   const descendants = usePersonDescendants(personId);
   const updatePerson = useUpdatePerson(family.id, personId);
@@ -82,6 +85,9 @@ export function PersonDetailPanel({
 
   useEffect(() => {
     setSaveNotice(null);
+    deleteRelationship.reset();
+    // reset is stable; the mutation result object is not, so it stays out of the deps.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [person.id]);
 
   useEffect(() => {
@@ -313,9 +319,11 @@ export function PersonDetailPanel({
               {detail.data.relationships.map((rel) => (
                 <li
                   key={rel.id}
-                  className="flex items-center justify-between rounded-lg bg-teal-950/5 px-3 py-2 text-sm"
+                  className="flex items-start justify-between gap-3 rounded-lg bg-teal-950/5 px-3 py-2 text-sm"
                 >
-                  <span className="capitalize text-slate-700">{rel.type}</span>
+                  <span className="min-w-0 text-slate-700">
+                    {relationshipLabel(rel, personId, tree.data?.persons ?? [])}
+                  </span>
                   {canEdit && (
                     <Button
                       variant="ghost"

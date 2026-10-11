@@ -173,3 +173,127 @@ func TestUpdatePhoto(t *testing.T) {
 		t.Errorf("error = %v, want ErrInvalidUpload", err)
 	}
 }
+
+func TestAllowAnotherSpouseRejectBloodMarriage(t *testing.T) {
+	families := newFakeFamilyRepo()
+	persons := newFakePersonRepo()
+	rels := newFakeRelationshipRepo()
+	users := newFakeUserRepo()
+	svc := NewPersonService(families, persons, rels, users, t.TempDir(), 1<<20)
+	ctx := context.Background()
+	userID, familyID := seedEditor(t, users, families, domain.FamilyRoleEditor)
+
+	hasnah, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Hasnah", Gender: domain.GenderFemale})
+	shafa, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Shafa", Gender: domain.GenderMale})
+	ali, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Ali", Gender: domain.GenderMale})
+	child, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Child", Gender: domain.GenderFemale})
+
+	if _, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: hasnah.ID, ToPersonID: shafa.ID, Type: domain.RelationshipSpouse,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	secondWife, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Second", Gender: domain.GenderFemale})
+	if _, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: shafa.ID, ToPersonID: secondWife.ID, Type: domain.RelationshipSpouse,
+	}); err != nil {
+		t.Fatalf("second wife = %v", err)
+	}
+	_, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: hasnah.ID, ToPersonID: ali.ID, Type: domain.RelationshipSpouse,
+	})
+	if !errors.Is(err, domain.ErrInvalidRelationship) {
+		t.Fatalf("second husband error = %v", err)
+	}
+	_, err = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: shafa.ID, ToPersonID: hasnah.ID, Type: domain.RelationshipSpouse,
+	})
+	if !errors.Is(err, domain.ErrRelationshipExists) {
+		t.Fatalf("duplicate spouse error = %v", err)
+	}
+
+	if _, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: ali.ID, ToPersonID: shafa.ID, Type: domain.RelationshipParent,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: ali.ID, ToPersonID: shafa.ID, Type: domain.RelationshipSpouse,
+	})
+	if !errors.Is(err, domain.ErrInvalidRelationship) {
+		t.Fatalf("parent-spouse error = %v", err)
+	}
+
+	if _, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: shafa.ID, ToPersonID: child.ID, Type: domain.RelationshipParent,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	_, err = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: shafa.ID, ToPersonID: child.ID, Type: domain.RelationshipSpouse,
+	})
+	if !errors.Is(err, domain.ErrInvalidRelationship) {
+		t.Fatalf("child-spouse error = %v", err)
+	}
+}
+
+func TestRejectSiblingMarriageAndYoungerParent(t *testing.T) {
+	families := newFakeFamilyRepo()
+	persons := newFakePersonRepo()
+	rels := newFakeRelationshipRepo()
+	users := newFakeUserRepo()
+	svc := NewPersonService(families, persons, rels, users, t.TempDir(), 1<<20)
+	ctx := context.Background()
+	userID, familyID := seedEditor(t, users, families, domain.FamilyRoleEditor)
+
+	parent, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Parent", Gender: domain.GenderMale})
+	a, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "A", Gender: domain.GenderMale})
+	b, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "B", Gender: domain.GenderFemale})
+	_, _ = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: parent.ID, ToPersonID: a.ID, Type: domain.RelationshipParent,
+	})
+	_, _ = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: parent.ID, ToPersonID: b.ID, Type: domain.RelationshipParent,
+	})
+	_, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: a.ID, ToPersonID: b.ID, Type: domain.RelationshipSpouse,
+	})
+	if !errors.Is(err, domain.ErrInvalidRelationship) {
+		t.Fatalf("sibling marriage error = %v", err)
+	}
+
+	older := time.Date(2001, 1, 1, 0, 0, 0, 0, time.UTC)
+	younger := time.Date(1968, 1, 1, 0, 0, 0, 0, time.UTC)
+	bornLate, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Late", Gender: domain.GenderMale, BirthDate: &older})
+	bornEarly, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "Early", Gender: domain.GenderMale, BirthDate: &younger})
+	_, err = svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: bornLate.ID, ToPersonID: bornEarly.ID, Type: domain.RelationshipParent,
+	})
+	if !errors.Is(err, domain.ErrInvalidRelationship) {
+		t.Fatalf("younger parent error = %v", err)
+	}
+}
+
+func TestDeleteMissingRelationshipIsIdempotent(t *testing.T) {
+	families := newFakeFamilyRepo()
+	persons := newFakePersonRepo()
+	rels := newFakeRelationshipRepo()
+	users := newFakeUserRepo()
+	svc := NewPersonService(families, persons, rels, users, t.TempDir(), 1<<20)
+	ctx := context.Background()
+	userID, familyID := seedEditor(t, users, families, domain.FamilyRoleEditor)
+	a, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "A", Gender: domain.GenderMale})
+	b, _ := svc.Create(ctx, userID, familyID, domain.CreatePersonInput{FirstName: "B", Gender: domain.GenderFemale})
+	rel, err := svc.CreateRelationship(ctx, userID, familyID, domain.CreateRelationshipInput{
+		FromPersonID: a.ID, ToPersonID: b.ID, Type: domain.RelationshipSpouse,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteRelationship(ctx, userID, rel.ID); err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteRelationship(ctx, userID, rel.ID); err != nil {
+		t.Fatalf("second delete = %v, want nil", err)
+	}
+}

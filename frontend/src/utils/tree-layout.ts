@@ -102,15 +102,9 @@ function orderGeneration(
 
   for (const person of people) {
     if (used.has(person.id)) continue;
-    const partner = spouseOnRow(person, gen, generations, spouseRels, people);
-    if (partner) {
-      used.add(person.id);
-      used.add(partner.id);
-      units.push(orderCouple(person, partner, parentRels));
-    } else {
-      used.add(person.id);
-      units.push([person]);
-    }
+    const household = householdOnRow(person, gen, generations, spouseRels, people);
+    for (const member of household) used.add(member.id);
+    units.push(household.length > 1 ? orderHousehold(household, parentRels) : household);
   }
 
   units.sort((a, b) => {
@@ -123,27 +117,44 @@ function orderGeneration(
   return units.flat();
 }
 
-function spouseOnRow(
+function householdOnRow(
   person: Person,
   gen: number,
   generations: Map<string, number>,
   spouseRels: Relationship[],
   people: Person[],
-): Person | undefined {
-  const rel = spouseRels.find(
-    (edge) => edge.from_person_id === person.id || edge.to_person_id === person.id,
-  );
-  if (!rel) return undefined;
-  const otherId = rel.from_person_id === person.id ? rel.to_person_id : rel.from_person_id;
-  if ((generations.get(otherId) ?? 0) !== gen) return undefined;
-  return people.find((candidate) => candidate.id === otherId);
+): Person[] {
+  const onRow = new Map(people.map((candidate) => [candidate.id, candidate]));
+  const seen = new Set<string>();
+  const queue = [person.id];
+  const members: Person[] = [];
+
+  while (queue.length > 0) {
+    const id = queue.pop();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    const member = onRow.get(id);
+    if (!member) continue;
+    members.push(member);
+    for (const rel of spouseRels) {
+      const otherId =
+        rel.from_person_id === id ? rel.to_person_id : rel.to_person_id === id ? rel.from_person_id : undefined;
+      if (!otherId || !onRow.has(otherId) || (generations.get(otherId) ?? 0) !== gen) continue;
+      queue.push(otherId);
+    }
+  }
+
+  return members;
 }
 
-function orderCouple(a: Person, b: Person, parentRels: Relationship[]): Person[] {
-  const aBlood = hasParent(a.id, parentRels);
-  const bBlood = hasParent(b.id, parentRels);
-  if (aBlood !== bBlood) return aBlood ? [b, a] : [a, b];
-  return displayName(a).localeCompare(displayName(b)) <= 0 ? [a, b] : [b, a];
+/** Wives sit beside the bloodline person, split to both sides when there are several. */
+function orderHousehold(members: Person[], parentRels: Relationship[]): Person[] {
+  const byName = (a: Person, b: Person) => displayName(a).localeCompare(displayName(b));
+  const blood = members.filter((person) => hasParent(person.id, parentRels)).sort(byName);
+  const marriedIn = members.filter((person) => !hasParent(person.id, parentRels)).sort(byName);
+  if (blood.length === 0) return [...members].sort(byName);
+  const leftCount = Math.ceil(marriedIn.length / 2);
+  return [...marriedIn.slice(0, leftCount), ...blood, ...marriedIn.slice(leftCount)];
 }
 
 function hasParent(personId: string, parentRels: Relationship[]): boolean {
@@ -157,16 +168,33 @@ function unitAnchor(
   generations: Map<string, number>,
   placedX: Map<string, number>,
 ): number {
-  const anchors: number[] = [];
+  const parentXs: number[] = [];
   for (const person of unit) {
     for (const rel of parentRels) {
       if (rel.to_person_id !== person.id) continue;
-      const parentX = coupleMidpoint(rel.from_person_id, spouseRels, generations, placedX);
-      if (parentX !== undefined) anchors.push(parentX);
+      const parentX = placedX.get(rel.from_person_id);
+      if (parentX !== undefined) parentXs.push(parentX);
     }
   }
-  if (anchors.length === 0) return Number.POSITIVE_INFINITY;
-  return anchors.reduce((sum, value) => sum + value, 0) / anchors.length;
+  if (parentXs.length === 0) return Number.POSITIVE_INFINITY;
+  if (parentXs.length === 1) {
+    const onlyParent = parentIdOf(unit, parentRels, placedX);
+    return onlyParent ? coupleMidpoint(onlyParent, spouseRels, generations, placedX) ?? parentXs[0] : parentXs[0];
+  }
+  return parentXs.reduce((sum, value) => sum + value, 0) / parentXs.length;
+}
+
+function parentIdOf(
+  unit: Person[],
+  parentRels: Relationship[],
+  placedX: Map<string, number>,
+): string | undefined {
+  for (const person of unit) {
+    for (const rel of parentRels) {
+      if (rel.to_person_id === person.id && placedX.has(rel.from_person_id)) return rel.from_person_id;
+    }
+  }
+  return undefined;
 }
 
 function coupleMidpoint(
@@ -178,15 +206,20 @@ function coupleMidpoint(
   const own = placedX.get(personId);
   if (own === undefined) return undefined;
   const gen = generations.get(personId);
-  const rel = spouseRels.find(
-    (edge) => edge.from_person_id === personId || edge.to_person_id === personId,
-  );
-  if (!rel || gen === undefined) return own;
-  const otherId = rel.from_person_id === personId ? rel.to_person_id : rel.from_person_id;
-  if ((generations.get(otherId) ?? -1) !== gen) return own;
-  const other = placedX.get(otherId);
-  if (other === undefined) return own;
-  return (own + other) / 2;
+  if (gen === undefined) return own;
+  const spouses = spouseRels.flatMap((edge) => {
+    const otherId =
+      edge.from_person_id === personId
+        ? edge.to_person_id
+        : edge.to_person_id === personId
+          ? edge.from_person_id
+          : undefined;
+    if (!otherId || (generations.get(otherId) ?? -1) !== gen) return [];
+    const other = placedX.get(otherId);
+    return other === undefined ? [] : [other];
+  });
+  if (spouses.length !== 1) return own;
+  return (own + spouses[0]) / 2;
 }
 
 /** Assigns generation rows and x positions for a simple top-down tree layout. */
@@ -248,7 +281,14 @@ export function edgePath(from: TreeNodePosition, to: TreeNodePosition, type: Rel
     const left = start.x <= end.x ? from : to;
     const right = start.x <= end.x ? to : from;
     const y = (nodeCenter(left).y + nodeCenter(right).y) / 2;
-    return `M ${left.x + NODE_WIDTH} ${y} L ${right.x} ${y}`;
+    const gap = right.x - (left.x + NODE_WIDTH);
+    const sameRow = Math.abs(left.y - right.y) < 2;
+    if (!sameRow || gap <= H_GAP + 8) {
+      return `M ${left.x + NODE_WIDTH} ${y} L ${right.x} ${y}`;
+    }
+    const arcY = Math.min(left.y, right.y) - 28;
+    const midX = (left.x + NODE_WIDTH + right.x) / 2;
+    return `M ${left.x + NODE_WIDTH} ${y} Q ${midX} ${arcY}, ${right.x} ${y}`;
   }
 
   const midY = (start.y + end.y) / 2;

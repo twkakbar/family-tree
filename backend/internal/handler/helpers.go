@@ -109,7 +109,12 @@ func respondError(c *gin.Context, err error) {
 	case errors.Is(err, domain.ErrLastOwner):
 		response.Error(c, http.StatusConflict, codeConflict, "family must retain at least one owner")
 	case errors.Is(err, domain.ErrInvalidRelationship):
-		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "invalid relationship or person data")
+		msg := "invalid relationship or person data"
+		var rule *domain.RelationshipRuleError
+		if errors.As(err, &rule) && rule.Reason != "" {
+			msg = rule.Reason
+		}
+		response.Error(c, http.StatusUnprocessableEntity, codeValidation, msg)
 	case errors.Is(err, domain.ErrRelationshipExists):
 		response.Error(c, http.StatusConflict, codeConflict, "relationship already exists")
 	case errors.Is(err, domain.ErrAccessRequestPending):

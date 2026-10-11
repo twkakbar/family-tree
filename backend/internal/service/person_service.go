@@ -3,6 +3,7 @@ package service
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -191,7 +192,7 @@ func (s *personService) CreateRelationship(ctx context.Context, userID, familyID
 		return nil, domain.ErrInvalidRelationship
 	}
 	if in.FromPersonID == in.ToPersonID {
-		return nil, domain.ErrInvalidRelationship
+		return nil, domain.RejectRelationship("a person cannot be related to themselves")
 	}
 
 	fromID := in.FromPersonID
@@ -199,25 +200,15 @@ func (s *personService) CreateRelationship(ctx context.Context, userID, familyID
 	relType := in.Type
 
 	switch relType {
-	case domain.RelationshipParent:
-		parentCount, err := s.relationships.CountParentsOf(ctx, toID)
-		if err != nil {
-			return nil, err
-		}
-		if parentCount >= 2 {
-			return nil, domain.ErrInvalidRelationship
-		}
-		cycle, err := s.relationships.HasAncestorPath(ctx, fromID, toID)
-		if err != nil {
-			return nil, err
-		}
-		if cycle {
-			return nil, domain.ErrInvalidRelationship
-		}
 	case domain.RelationshipSpouse:
 		fromID, toID = canonicalSpousePair(fromID, toID)
+	case domain.RelationshipParent:
 	default:
 		return nil, domain.ErrInvalidRelationship
+	}
+
+	if err := s.rejectIllogicalLink(ctx, relType, fromPerson, toPerson, fromID, toID); err != nil {
+		return nil, err
 	}
 
 	now := time.Now().UTC()
@@ -238,13 +229,152 @@ func (s *personService) CreateRelationship(ctx context.Context, userID, familyID
 
 func (s *personService) DeleteRelationship(ctx context.Context, userID, relationshipID uuid.UUID) error {
 	rel, err := s.relationships.GetByID(ctx, relationshipID)
+	if errors.Is(err, domain.ErrNotFound) {
+		// Already gone (double-click, or the other card removed it). The studio
+		// should refresh, not show "resource not found".
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 	if _, err := s.requireFamily(ctx, userID, rel.FamilyID, domain.FamilyRoleEditor); err != nil {
 		return err
 	}
-	return s.relationships.Delete(ctx, relationshipID)
+	err = s.relationships.Delete(ctx, relationshipID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	return err
+}
+
+// rejectIllogicalLink blocks edges that would corrupt the lineage: marrying a
+// blood relative, a wife who already has a husband, a parent who is already a
+// spouse, a third parent, a cycle, or a parent born after the child. A husband
+// may have more than one wife.
+func (s *personService) rejectIllogicalLink(ctx context.Context, relType domain.RelationshipType, from, to *domain.Person, fromID, toID uuid.UUID) error {
+	existing, err := s.relationships.ListForPerson(ctx, from.ID)
+	if err != nil {
+		return err
+	}
+	for _, rel := range existing {
+		other := rel.ToPersonID
+		if other == from.ID {
+			other = rel.FromPersonID
+		}
+		if other != to.ID {
+			continue
+		}
+		sameEdge := rel.Type == relType && (relType == domain.RelationshipSpouse || (rel.FromPersonID == fromID && rel.ToPersonID == toID))
+		if sameEdge {
+			return domain.ErrRelationshipExists
+		}
+		if rel.Type == domain.RelationshipParent && relType == domain.RelationshipParent {
+			return domain.RejectRelationship("these two are already parent and child")
+		}
+		if rel.Type != relType {
+			return domain.RejectRelationship("a parent and child cannot also be spouses")
+		}
+	}
+
+	switch relType {
+	case domain.RelationshipSpouse:
+		if err := s.rejectSecondHusband(ctx, from); err != nil {
+			return err
+		}
+		if err := s.rejectSecondHusband(ctx, to); err != nil {
+			return err
+		}
+		blood, err := s.areBloodRelatives(ctx, from.ID, to.ID)
+		if err != nil {
+			return err
+		}
+		if blood {
+			return domain.RejectRelationship("a person cannot marry their parent, child, ancestor, or descendant")
+		}
+		siblings, err := s.areSiblings(ctx, from.ID, to.ID)
+		if err != nil {
+			return err
+		}
+		if siblings {
+			return domain.RejectRelationship("a person cannot marry their sibling")
+		}
+	case domain.RelationshipParent:
+		count, err := s.relationships.CountParentsOf(ctx, toID)
+		if err != nil {
+			return err
+		}
+		if count >= 2 {
+			return domain.RejectRelationship("a person can have at most two parents")
+		}
+		cycle, err := s.relationships.HasAncestorPath(ctx, fromID, toID)
+		if err != nil {
+			return err
+		}
+		if cycle {
+			return domain.RejectRelationship("that parent link would create a cycle")
+		}
+		if from.BirthDate != nil && to.BirthDate != nil && from.BirthDate.After(*to.BirthDate) {
+			return domain.RejectRelationship("a parent cannot be born after their child")
+		}
+	}
+	return nil
+}
+
+// rejectSecondHusband allows a husband more than one wife, and keeps every
+// other person to a single spouse.
+func (s *personService) rejectSecondHusband(ctx context.Context, person *domain.Person) error {
+	if person.Gender == domain.GenderMale {
+		return nil
+	}
+	rels, err := s.relationships.ListForPerson(ctx, person.ID)
+	if err != nil {
+		return err
+	}
+	for _, rel := range rels {
+		if rel.Type == domain.RelationshipSpouse {
+			return domain.RejectRelationship("a wife can have only one husband")
+		}
+	}
+	return nil
+}
+
+func (s *personService) areBloodRelatives(ctx context.Context, a, b uuid.UUID) (bool, error) {
+	aFromB, err := s.relationships.HasAncestorPath(ctx, a, b)
+	if err != nil || aFromB {
+		return aFromB, err
+	}
+	return s.relationships.HasAncestorPath(ctx, b, a)
+}
+
+func (s *personService) areSiblings(ctx context.Context, a, b uuid.UUID) (bool, error) {
+	aParents, err := parentIDs(ctx, s.relationships, a)
+	if err != nil {
+		return false, err
+	}
+	bParents, err := parentIDs(ctx, s.relationships, b)
+	if err != nil {
+		return false, err
+	}
+	for id := range aParents {
+		if _, ok := bParents[id]; ok {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func parentIDs(ctx context.Context, rels domain.RelationshipRepository, personID uuid.UUID) (map[uuid.UUID]struct{}, error) {
+	list, err := rels.ListForPerson(ctx, personID)
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[uuid.UUID]struct{})
+	for _, rel := range list {
+		if rel.Type == domain.RelationshipParent && rel.ToPersonID == personID {
+			out[rel.FromPersonID] = struct{}{}
+		}
+	}
+	return out, nil
 }
 
 func (s *personService) UpdatePhoto(ctx context.Context, userID, personID uuid.UUID, data []byte) (*domain.Person, error) {

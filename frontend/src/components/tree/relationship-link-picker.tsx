@@ -2,14 +2,19 @@
 
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import type { Person } from "@/types/person";
+import type { Person, Relationship } from "@/types/person";
 import { displayName } from "@/utils/tree-layout";
+import {
+  allowedLinkChoices,
+  type RelationshipLinkChoice,
+} from "@/utils/relationship-rules";
 
-export type RelationshipLinkChoice = "parent-of-target" | "child-of-target" | "spouse";
+export type { RelationshipLinkChoice };
 
 interface RelationshipLinkPickerProps {
   source: Person;
   target: Person;
+  relationships?: Relationship[];
   loading?: boolean;
   error?: string | null;
   onChoose: (choice: RelationshipLinkChoice) => void;
@@ -20,6 +25,7 @@ interface RelationshipLinkPickerProps {
 export function RelationshipLinkPicker({
   source,
   target,
+  relationships = [],
   loading = false,
   error = null,
   onChoose,
@@ -27,6 +33,7 @@ export function RelationshipLinkPicker({
 }: RelationshipLinkPickerProps) {
   const sourceName = displayName(source);
   const targetName = displayName(target);
+  const choices = allowedLinkChoices(source, target, relationships);
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center p-4 sm:items-center" role="dialog">
@@ -63,24 +70,38 @@ export function RelationshipLinkPicker({
         )}
 
         <div className="mt-4 grid gap-2">
-          <ChoiceButton
-            title={`${sourceName} is the parent`}
-            subtitle={`of ${targetName}`}
-            loading={loading}
-            onClick={() => onChoose("parent-of-target")}
-          />
-          <ChoiceButton
-            title={`${targetName} is the parent`}
-            subtitle={`of ${sourceName}`}
-            loading={loading}
-            onClick={() => onChoose("child-of-target")}
-          />
-          <ChoiceButton
-            title="Spouse or partner"
-            subtitle={`Link ${sourceName} and ${targetName}`}
-            loading={loading}
-            onClick={() => onChoose("spouse")}
-          />
+          {choices.length === 0 && (
+            <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              These two are already connected in every way that fits a family tree. A spouse
+              link stays hidden when they are already spouses, when a wife already has a
+              husband, or when they are parent and child, siblings, or in the same bloodline.
+              A husband can still take another wife.
+            </p>
+          )}
+          {choices.includes("parent-of-target") && (
+            <ChoiceButton
+              title={`${sourceName} is the parent`}
+              subtitle={`of ${targetName}`}
+              loading={loading}
+              onClick={() => onChoose("parent-of-target")}
+            />
+          )}
+          {choices.includes("child-of-target") && (
+            <ChoiceButton
+              title={`${targetName} is the parent`}
+              subtitle={`of ${sourceName}`}
+              loading={loading}
+              onClick={() => onChoose("child-of-target")}
+            />
+          )}
+          {choices.includes("spouse") && (
+            <ChoiceButton
+              title="Spouse or partner"
+              subtitle={`Link ${sourceName} and ${targetName}`}
+              loading={loading}
+              onClick={() => onChoose("spouse")}
+            />
+          )}
         </div>
 
         <Button type="button" variant="ghost" className="mt-4 w-full" onClick={onCancel}>

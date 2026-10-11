@@ -268,7 +268,10 @@ function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["r
         const from = findNode3D(nodes, edge.from_person_id);
         const to = findNode3D(nodes, edge.to_person_id);
         if (!from || !to) return null;
-        const points = trimmedEnds(from, to, MEDALLION_RADIUS);
+        const points =
+          edge.type === "spouse"
+            ? spousePoints(from, to, nodes, MEDALLION_RADIUS)
+            : trimmedEnds(from, to, MEDALLION_RADIUS);
         const isSpouse = edge.type === "spouse";
         return (
           <Line
@@ -286,6 +289,27 @@ function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["r
       })}
     </>
   );
+}
+
+/** Spouse lines rise over anyone sitting between the two partners. */
+function spousePoints(from: Node3D, to: Node3D, nodes: Node3D[], radius: number): THREE.Vector3[] {
+  const [start, end] = trimmedEnds(from, to, radius);
+  const left = Math.min(from.x, to.x);
+  const right = Math.max(from.x, to.x);
+  const blocked =
+    Math.abs(from.y - to.y) < 0.5 &&
+    nodes.some(
+      (node) =>
+        node.person.id !== from.person.id &&
+        node.person.id !== to.person.id &&
+        Math.abs(node.y - from.y) < 0.5 &&
+        node.x > left + 0.2 &&
+        node.x < right - 0.2,
+    );
+  if (!blocked) return [start, end];
+  const mid = start.clone().lerp(end, 0.5);
+  mid.y += 0.85;
+  return [start, mid, end];
 }
 
 /** Pull both ends back so the stroke meets the gold rim, not the portrait. */

@@ -177,10 +177,15 @@ Create a relationship edge.
 ```
 
 **Service invariants:**
-- Both persons belong to the family.
-- `parent`: child has ≤ 2 parent edges; no cycles (parent cannot be a
-  descendant of the child).
-- `spouse`: pair normalized to canonical order automatically.
+- Both persons belong to the family, and a person cannot be linked to themselves.
+- `parent`: child has at most 2 parents; no cycles; a parent cannot be born
+  after the child when both birth dates are set; a parent and child cannot
+  also be spouses.
+- `spouse`: pair normalized to canonical order. A husband may have more than
+  one wife. A wife can have only one husband. Spouses cannot be parent and
+  child, siblings, or ancestor and descendant. The same pair cannot be linked
+  twice.
+- A duplicate of the same edge returns `409`.
 
 **Response `201`** — Relationship object.
 
@@ -192,7 +197,8 @@ Create a relationship edge.
 
 ## `DELETE /relationships/:id`
 
-Remove a relationship edge (hard delete).
+Remove a relationship edge (hard delete). Deleting an id that is already
+gone returns `200` so a second click does not surface "resource not found".
 
 **Auth:** `editor+` on the relationship's family
 

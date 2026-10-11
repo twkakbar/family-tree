@@ -16,6 +16,7 @@ import { personSchema } from "@/lib/validations/person";
 import { ApiError } from "@/types/api";
 import type { Family } from "@/types/family";
 import type { Person } from "@/types/person";
+import { canHaveAnotherSpouse } from "@/utils/relationship-rules";
 import { displayName } from "@/utils/tree-layout";
 import { cn } from "@/utils/cn";
 
@@ -81,7 +82,10 @@ export function SimpleMemberForm({ family, onCreated }: SimpleMemberFormProps) {
 
   const linkKind = form.watch("link_kind");
   const linkPersonId = form.watch("link_person_id") ?? "";
-  const people = tree.data?.persons ?? [];
+  const relationships = tree.data?.relationships ?? [];
+  const people = (tree.data?.persons ?? []).filter((person) =>
+    linkKind === "spouse_of" ? canHaveAnotherSpouse(person, relationships) : true,
+  );
 
   const apiError =
     (createPerson.error instanceof ApiError && !createPerson.isPending
