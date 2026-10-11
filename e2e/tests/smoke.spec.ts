@@ -37,8 +37,9 @@ test.describe("api probes", () => {
 
   test("public meta returns royal family", async ({ request }) => {
     const res = await request.get("/api/v1/public/meta");
-    expect(res.ok()).toBeTruthy();
-    const envelope = await res.json();
+    const body = await res.text();
+    expect(res.ok(), body).toBeTruthy();
+    const envelope = JSON.parse(body) as { success?: boolean; data?: { name?: string } };
     expect(envelope.success).toBe(true);
     expect(envelope.data?.name).toBeTruthy();
   });
