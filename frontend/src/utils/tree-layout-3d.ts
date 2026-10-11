@@ -1,4 +1,5 @@
 import type { FamilyTreeData, Person, Relationship } from "@/types/person";
+import { peopleByGeneration } from "@/utils/tree-layout";
 
 export interface Node3D {
   person: Person;
@@ -17,56 +18,16 @@ const X_GAP = 2.4;
 const Y_GAP = 2.8;
 const Z_JITTER = 0.35;
 
-/** Hierarchical 3D layout: generations on Y, siblings on X, slight Z depth. */
+/** Hierarchical 3D layout: generations on Y, spouses beside each other, children below. */
 export function layoutTree3D(data: FamilyTreeData): Layout3D {
   if (data.persons.length === 0) {
     return { nodes: [], edges: [] };
   }
 
-  const generations = new Map<string, number>();
-  for (const person of data.persons) {
-    generations.set(person.id, 0);
-  }
-
-  const parentRels = data.relationships.filter((r) => r.type === "parent");
-  const spouseRels = data.relationships.filter((r) => r.type === "spouse");
-
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const rel of parentRels) {
-      const parentGen = generations.get(rel.from_person_id) ?? 0;
-      const childGen = generations.get(rel.to_person_id) ?? 0;
-      const next = parentGen + 1;
-      if (next > childGen) {
-        generations.set(rel.to_person_id, next);
-        changed = true;
-      }
-    }
-  }
-
-  for (const rel of spouseRels) {
-    const a = generations.get(rel.from_person_id) ?? 0;
-    const b = generations.get(rel.to_person_id) ?? 0;
-    const aligned = Math.min(a, b);
-    generations.set(rel.from_person_id, aligned);
-    generations.set(rel.to_person_id, aligned);
-  }
-
-  const byGeneration = new Map<number, Person[]>();
-  for (const person of data.persons) {
-    const gen = generations.get(person.id) ?? 0;
-    const bucket = byGeneration.get(gen) ?? [];
-    bucket.push(person);
-    byGeneration.set(gen, bucket);
-  }
-
+  const rows = peopleByGeneration(data);
   const nodes: Node3D[] = [];
-  const sortedGens = [...byGeneration.keys()].sort((a, b) => a - b);
 
-  for (const gen of sortedGens) {
-    const row = byGeneration.get(gen) ?? [];
-    row.sort((a, b) => displayName(a).localeCompare(displayName(b)));
+  rows.forEach((row, gen) => {
     const offset = (row.length - 1) / 2;
     row.forEach((person, index) => {
       const hash = hashId(person.id);
@@ -78,7 +39,7 @@ export function layoutTree3D(data: FamilyTreeData): Layout3D {
         z: ((hash % 100) / 100 - 0.5) * 2 * Z_JITTER,
       });
     });
-  }
+  });
 
   const ids = new Set(data.persons.map((p) => p.id));
   return {
