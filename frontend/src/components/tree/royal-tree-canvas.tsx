@@ -18,7 +18,6 @@ interface RoyalTreeCanvasProps {
 
 const GOLD = "#d4af37";
 const GOLD_BRIGHT = "#f0c75e";
-const SEA_FACE = "#124a50";
 const INK = "#04151a";
 /** Outer gold edge. Lines stop here so they do not cut through the portrait. */
 const MEDALLION_RADIUS = 0.36;
@@ -151,14 +150,17 @@ function MedallionFace({
   return (
     <mesh>
       <circleGeometry args={[FACE_RADIUS, 64]} />
-      <meshStandardMaterial
-        map={texture ?? initialsTexture}
-        color={texture ? "#ffffff" : selected ? "#1a5c58" : SEA_FACE}
-        roughness={texture ? 0.55 : 0.45}
-        metalness={texture ? 0.05 : 0.2}
-        emissive={selected ? "#3a2a10" : "#000000"}
-        emissiveIntensity={selected ? 0.12 : 0}
-      />
+      {texture ? (
+        <meshStandardMaterial
+          map={texture}
+          roughness={0.55}
+          metalness={0.05}
+          emissive={selected ? "#3a2a10" : "#000000"}
+          emissiveIntensity={selected ? 0.12 : 0}
+        />
+      ) : (
+        <meshBasicMaterial map={initialsTexture} toneMapped={false} />
+      )}
     </mesh>
   );
 }
@@ -175,11 +177,11 @@ function useInitialsTexture(initials: string, selected: boolean): THREE.CanvasTe
     if (!ctx) return tex;
 
     ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = selected ? "#1a5c58" : "#124a50";
+    ctx.fillStyle = selected ? "#1f6f68" : "#14615c";
     ctx.beginPath();
     ctx.arc(size / 2, size / 2, size / 2 - 1, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = "#f6e6c0";
+    ctx.fillStyle = "#fef3c7";
     ctx.font = "600 88px Georgia, serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
