@@ -52,7 +52,12 @@ export function ExploreExperience() {
             <Spinner className="size-8 text-teal-300" />
           </div>
         ) : tree.data && tree.data.persons.length > 0 ? (
-          <RoyalTreeCanvas data={tree.data} selectedId={selected?.id} onSelect={setSelected} />
+          <RoyalTreeCanvas
+            data={tree.data}
+            selectedId={selected?.id}
+            onSelect={setSelected}
+            onDismiss={() => setSelected(null)}
+          />
         ) : (
           <div className="grid h-full place-items-center px-6 text-center">
             <div>

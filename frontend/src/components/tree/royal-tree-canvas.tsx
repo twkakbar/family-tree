@@ -2,7 +2,7 @@
 
 import { Billboard, Float, GradientTexture, Html, Line, OrbitControls } from "@react-three/drei";
 import { Canvas } from "@react-three/fiber";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import type { FamilyTreeData, Person } from "@/types/person";
@@ -12,6 +12,8 @@ interface RoyalTreeCanvasProps {
   data: FamilyTreeData;
   selectedId?: string | null;
   onSelect: (person: Person) => void;
+  /** Called when the user taps empty space, not a member. */
+  onDismiss?: () => void;
 }
 
 const GOLD = "#d4af37";
@@ -284,7 +286,7 @@ function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["r
 function SeaDepthSky() {
   return (
     <group>
-      <mesh scale={[-1, 1, 1]}>
+      <mesh scale={[-1, 1, 1]} raycast={() => null}>
         <sphereGeometry args={[70, 48, 32]} />
         <meshBasicMaterial side={THREE.BackSide} depthWrite={false}>
           <GradientTexture
@@ -297,7 +299,7 @@ function SeaDepthSky() {
       </mesh>
 
       {/* Faint gold dusk wash near the zenith */}
-      <mesh position={[0, 28, -8]} rotation={[0.35, 0, 0]}>
+      <mesh position={[0, 28, -8]} rotation={[0.35, 0, 0]} raycast={() => null}>
         <circleGeometry args={[22, 48]} />
         <meshBasicMaterial
           color={GOLD}
@@ -309,7 +311,7 @@ function SeaDepthSky() {
       </mesh>
 
       {/* Soft teal bloom low in the field — “sea glow” under the tree */}
-      <mesh position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]}>
+      <mesh position={[0, -10, 0]} rotation={[-Math.PI / 2, 0, 0]} raycast={() => null}>
         <circleGeometry args={[18, 48]} />
         <meshBasicMaterial
           color="#1a9b8e"
@@ -360,7 +362,9 @@ function Scene({ data, selectedId, onSelect }: RoyalTreeCanvasProps) {
 }
 
 /** Full-viewport WebGL royal tree. Dynamically import this component. */
-export function RoyalTreeCanvas(props: RoyalTreeCanvasProps) {
+export function RoyalTreeCanvas({ onDismiss, ...props }: RoyalTreeCanvasProps) {
+  const pointerStart = useRef<{ x: number; y: number } | null>(null);
+
   if (typeof window !== "undefined") {
     try {
       const canvas = document.createElement("canvas");
@@ -382,6 +386,17 @@ export function RoyalTreeCanvas(props: RoyalTreeCanvasProps) {
       className="h-full w-full touch-none"
       camera={{ position: [0, 2, 12], fov: 50 }}
       dpr={[1, 1.75]}
+      onPointerDown={(event) => {
+        pointerStart.current = { x: event.clientX, y: event.clientY };
+      }}
+      onPointerMissed={(event) => {
+        const start = pointerStart.current;
+        if (!onDismiss || !start) return;
+        const dx = event.clientX - start.x;
+        const dy = event.clientY - start.y;
+        if (dx * dx + dy * dy > 64) return;
+        onDismiss();
+      }}
     >
       <Suspense fallback={null}>
         <Scene {...props} />
