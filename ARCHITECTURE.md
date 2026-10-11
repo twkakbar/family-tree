@@ -247,8 +247,8 @@ Target: one Linux VM with Docker. Full runbook: `docs/DEPLOYMENT.md`.
   backup via `scripts/backup.sh` (cron documented).
 - **Volumes**: `postgres_data`, `uploads_data` (backend read-write, nginx
   read-only).
-- **Images**: built locally by default (`*_IMAGE` env overrides allow pulling
-  `twkakbar/family-tree-*` from Docker Hub instead — used by CD).
+- **Images**: local builds by default. Production pulls
+  `ghcr.io/twkakbar/family-tree-*` (ADR-0011). The VM does not compile.
 - **Monitoring**: `/healthz` + `/readyz` (versioned JSON); cron script
   `scripts/health-monitor.sh` and external uptime on `/readyz`.
 
@@ -258,10 +258,10 @@ Target: one Linux VM with Docker. Full runbook: `docs/DEPLOYMENT.md`.
   `go test -race`, build), frontend job (`npm ci`, ESLint, `tsc --noEmit`,
   `next build`), docker job (image build sanity), **e2e job** (Compose up +
   Playwright smoke against nginx).
-- `deploy.yml` (git tag `v*` or manual): builds and pushes images to Docker
-  Hub (`twkakbar/family-tree-backend|frontend|nginx`), then (if
-  `DEPLOY_ENABLED` repo variable is `true`) SSHes into the VM and runs
-  `docker compose pull && docker compose -f docker-compose.yml up -d`.
+- `deploy.yml`: after CI succeeds on `main` (or a manual run), builds and
+  pushes images to GHCR, then SSHes into the VM and runs
+  `docker compose pull` + `up -d` with `docker-compose.prod.yml` (ADR-0011).
+  No image build on the VM.
 - Required secrets/variables documented in `docs/DEPLOYMENT.md`.
 
 ## 9. ADR index
@@ -278,6 +278,7 @@ Target: one Linux VM with Docker. Full runbook: `docs/DEPLOYMENT.md`.
 | `docs/adr/0008` | JSON export/import into singleton royal family |
 | `docs/adr/0009` | Password reset / email_verified without SMTP |
 | `docs/adr/0010` | CSP + hardened security headers at nginx |
+| `docs/adr/0011` | Build images in Actions and deploy from GHCR |
 
 Add a new ADR whenever a decision changes structure, stack, security model or
 data model.

@@ -100,8 +100,7 @@ services:
     restart: unless-stopped
     ports:
       - "${NGINX_HTTP_PORT:-80}:80"
-      # For TLS: publish 443 and mount certificates (see docs/DEPLOYMENT.md)
-      # - "443:443"
+      # TLS (443, certificates, HTTP→HTTPS) lives in docker-compose.prod.yml
     volumes:
       - uploads_data:/var/www/uploads:ro
     depends_on:

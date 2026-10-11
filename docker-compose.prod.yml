@@ -1,0 +1,18 @@
+# Production overrides. Not included in the dev COMPOSE_FILE.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires a Let's Encrypt certificate on the host before nginx can start.
+# See docs/DEPLOYMENT.md §4.
+# Ports and volumes here are merged with docker-compose.yml (80 and the
+# uploads volume stay defined there).
+
+services:
+  nginx:
+    ports:
+      - "${NGINX_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/nginx/prod.conf.d/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/nginx/conf.d/security-headers-tls.inc:/etc/nginx/conf.d/security-headers-tls.inc:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - /var/www/certbot:/var/www/certbot:ro

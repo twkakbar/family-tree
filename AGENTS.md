@@ -175,7 +175,8 @@ Implemented:
   `scripts/health-monitor.sh`, Playwright smoke E2E in CI against Compose.
 
 Released:
-- `v0.1.0` — foundation images on Docker Hub; SSH deploy still optional.
+- `v0.1.0` — foundation images. Current production deploys from GHCR via
+  GitHub Actions to `twkakbar.my.id` (ADR-0011), not by building on the VM.
 
 Not implemented yet (see `CONTEXT.md` / deferred):
 - SMTP email delivery (verification + reset emails).
@@ -185,3 +186,16 @@ Not implemented yet (see `CONTEXT.md` / deferred):
 API docs: `docs/api/public.md`, `docs/api/access-requests.md`,
 `docs/api/persons.md`, `docs/api/export-import.md`, `docs/api/admin-users.md`.
 Ops: `docs/DEPLOYMENT.md` (backups, monitoring, security headers).
+
+## Learned User Preferences
+
+- The public first screen is the 3D explore tree. The earlier homepage is an about page reached from home. `/login` and `/register` stay available by URL, without sign-in or edit-access prompts on public pages.
+- Studio and admin member entry stays simple enough for older editors: one name field, male or female only in that form, a search when choosing who to link, and a popup to edit the person selected on the tree.
+- Relationships are added by dragging on the tree. Long names and birth places stay readable; name plaques use one compact size and show the full name on hover.
+- Public tree, studio, and admin share a modern Aceh look: gold-rimmed portrait medallions, a teal sea-depth background, an Aceh identity icon, and photo previews that show the whole image.
+- Update `README.md` with the product whenever features change; the user checks it for staleness.
+
+## Learned Workspace Facts
+
+- Public tree nodes are gold-rimmed portrait medallions (photo or initials) on a teal sea-depth backdrop.
+- The simple member form offers only male and female. Person API and database gender values remain `male`, `female`, `other`, and `unknown`.

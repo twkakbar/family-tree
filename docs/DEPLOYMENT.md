@@ -41,8 +41,8 @@ Production `.env` checklist:
 Start:
 
 ```bash
-docker compose -f docker-compose.yml up -d --build
-docker compose ps                          # all services healthy?
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
 curl -s http://localhost/healthz           # {"status":"ok",...}
 ```
 
@@ -50,58 +50,86 @@ Migrations run automatically on backend startup (`RUN_MIGRATIONS=true`).
 
 ## 3. Updating
 
+Normal updates are deployed by GitHub Actions after CI passes on `main`
+(ADR-0011). The VM pulls images; it does not compile.
+
+Manual fallback on the VM:
+
 ```bash
 cd /opt/family-tree
-git pull
-docker compose -f docker-compose.yml up -d --build
+git fetch --depth 1 origin main && git reset --hard origin/main
+docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
 docker image prune -f
 ```
 
-Zero-ish downtime is not a goal (CONTEXT.md constraints); expect a few
-seconds of restart.
+Expect a few seconds of restart. `.env` secrets stay on the VM. Deploy only
+rewrites the three `*_IMAGE` lines.
 
 ## 4. TLS (Let's Encrypt)
 
-1. Point your domain's A record at the VM.
-2. Obtain certificates on the host:
-   `apt-get install -y certbot && certbot certonly --standalone -d example.com`
-   (stop nginx briefly, or use the webroot method later).
-3. In `docker-compose.yml` (nginx service): publish `443:443` and mount
-   `/etc/letsencrypt:/etc/letsencrypt:ro`.
-4. In `docker/nginx/conf.d/default.conf`: enable the commented TLS server
-   block, set `server_name`, and redirect HTTP→HTTPS.
-5. Set `COOKIE_SECURE=true` in `.env`, then
-   `docker compose -f docker-compose.yml up -d --build`.
-6. Auto-renewal: certbot installs a systemd timer; add a deploy hook that
-   runs `docker compose -f /opt/family-tree/docker-compose.yml restart nginx`.
+Production host: `twkakbar.my.id` → this VM. `www` is not configured.
+Nginx listens on 443, redirects port 80 to HTTPS, and reads the certificate
+from `/etc/letsencrypt` (mounted read-only). ACME challenges are served from
+`/var/www/certbot`. Login cookies require `COOKIE_SECURE=true`.
+
+First issue (stop nginx so standalone can bind port 80):
+
+```bash
+sudo apt-get install -y certbot
+sudo mkdir -p /var/www/certbot
+cd /opt/family-tree
+docker compose -f docker-compose.yml -f docker-compose.prod.yml stop nginx
+sudo certbot certonly --standalone -d twkakbar.my.id \
+  --non-interactive --agree-tos -m twkakbar@gmail.com
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build nginx
+```
+
+Renewal uses webroot so nginx can stay up. Certbot's systemd timer calls
+`certbot renew`. A deploy hook must reload nginx, which caches certificates
+until restart:
+
+```bash
+# /etc/letsencrypt/renewal-hooks/deploy/restart-nginx.sh
+#!/bin/sh
+docker compose -f /opt/family-tree/docker-compose.yml -f /opt/family-tree/docker-compose.prod.yml restart nginx
+```
+
+Switch an existing standalone certificate to webroot after the HTTP
+challenge location is live:
+
+```bash
+sudo certbot certonly --webroot -w /var/www/certbot -d twkakbar.my.id \
+  --non-interactive --agree-tos -m twkakbar@gmail.com --keep-until-expiring
+```
 
 ## 5. CI/CD deploys (GitHub Actions)
 
-`deploy.yml` pushes images to Docker Hub on `v*` tags and can deploy over
-SSH.
+`deploy.yml` runs after the `CI` workflow succeeds on `main`, and can also
+be started by hand. It builds images in Actions, pushes them to GHCR, then
+SSHes into this VM (ADR-0011).
 
-Setup:
+Images:
 
-1. Repository **secrets** for the registry: `DOCKERHUB_USERNAME`
-   (`twkakbar`) and `DOCKERHUB_TOKEN` (Docker Hub → Account Settings →
-   Personal access tokens, with Read/Write scope).
-2. Repository **variables** to enable deploys: `DEPLOY_ENABLED=true`,
-   `DEPLOY_PATH=/opt/family-tree`.
-3. Repository **secrets** for SSH: `DEPLOY_HOST`, `DEPLOY_USER` (e.g.
-   `deploy`), `DEPLOY_SSH_KEY` (private key whose public half is in the
-   VM's `~/.ssh/authorized_keys`), optional `DEPLOY_PORT`.
-4. On the VM, switch `.env` to registry images so `docker compose pull`
-   works:
-
-```bash
-BACKEND_IMAGE=twkakbar/family-tree-backend:latest
-FRONTEND_IMAGE=twkakbar/family-tree-frontend:latest
-NGINX_IMAGE=twkakbar/family-tree-nginx:latest
+```text
+ghcr.io/twkakbar/family-tree-backend:latest
+ghcr.io/twkakbar/family-tree-frontend:latest
+ghcr.io/twkakbar/family-tree-nginx:latest
 ```
 
-   If the Docker Hub repositories are private, run a one-time
-   `docker login -u twkakbar` on the VM.
-5. Release: `git tag v1.0.0 && git push --tags`.
+Setup (already applied for `43.173.10.141`):
+
+1. Repository **variables**: `DEPLOY_ENABLED=true`,
+   `DEPLOY_PATH=/opt/family-tree`.
+2. Repository **secrets**: `DEPLOY_HOST`, `DEPLOY_USER` (`ubuntu`),
+   `DEPLOY_SSH_KEY` (private key). The matching public key is in
+   `/home/ubuntu/.ssh/authorized_keys` on the VM. Do not put the VM
+   password in GitHub.
+3. The VM `.env` image names are rewritten on each deploy to the GHCR
+   `:latest` tags above. Other secrets in `.env` are left alone.
+
+There is no Docker Hub token in this setup. Do not point `*_IMAGE` back at
+Docker Hub unless a new ADR says so.
 
 ## 6. Backups
 
