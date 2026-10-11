@@ -89,7 +89,6 @@ function PersonNode({
         <Html distanceFactor={9} position={[0, -0.58, 0]} center zIndexRange={[12, 0]}>
           <NamePlaque name={name} selected={selected} onSelect={onSelect} />
         </Html>
-      </group>
     </group>
   );
 }
