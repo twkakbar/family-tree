@@ -127,6 +127,8 @@ Setup (already applied for `43.173.10.141`):
    password in GitHub.
 3. The VM `.env` image names are rewritten on each deploy to the GHCR
    `:latest` tags above. Other secrets in `.env` are left alone.
+4. Images stay private. The deploy job logs into GHCR with the Actions
+   token for the pull, then logs out. Do not commit that token.
 
 There is no Docker Hub token in this setup. Do not point `*_IMAGE` back at
 Docker Hub unless a new ADR says so.

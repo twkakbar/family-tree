@@ -18,8 +18,9 @@ git tags. No Docker Hub token is available to Actions. GHCR accepts
 1. **Build only in GitHub Actions**, after the `CI` workflow succeeds on
    `main` (or when someone runs Deploy manually).
 2. **Publish to GHCR**: `ghcr.io/twkakbar/family-tree-backend|frontend|nginx`,
-   tagged `sha-<7>` and `latest`. Packages are public so the VM can pull
-   without a personal access token.
+   tagged `sha-<7>` and `latest`. Packages stay private. `GITHUB_TOKEN`
+   cannot change their visibility (the API returns 404). The deploy job
+   logs the VM into GHCR with that token only for the pull, then logs out.
 3. **The VM only pulls.** Deploy SSHes with a dedicated key, fast-forwards
    `/opt/family-tree` to `origin/main`, points `.env` image names at GHCR,
    then `docker compose -f docker-compose.yml -f docker-compose.prod.yml pull`
@@ -30,7 +31,7 @@ git tags. No Docker Hub token is available to Actions. GHCR accepts
 
 - A failed CI run does not deploy.
 - The first deploy after this ADR waits for CI, including the Compose e2e job.
-- Public images expose the build output, not secrets. Secrets stay in the
-  VM `.env`, which deploy does not overwrite except the three `*_IMAGE` lines.
+- Images stay private. The pull token is the job's `GITHUB_TOKEN` and is
+  not written into `.env`. Deploy rewrites only the three `*_IMAGE` lines.
 - Renewing or rotating the deploy key is a GitHub secret plus
   `authorized_keys` change, not a password in the workflow.
