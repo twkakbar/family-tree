@@ -1,14 +1,17 @@
 import { apiClient, unwrap } from "@/lib/api-client";
 import type { ApiEnvelope } from "@/types/api";
-import type { AuthResult, LoginInput, RegisterInput } from "@/types/auth";
+import type { AuthResult, LoginInput, RegisterInput, VerificationRequired } from "@/types/auth";
 
 /**
  * Auth API calls (docs/api/auth.md). The refresh token never appears here:
  * it lives in an httpOnly cookie managed by the backend.
  */
 export const authService = {
-  async register(input: RegisterInput): Promise<AuthResult> {
-    const res = await apiClient.post<ApiEnvelope<AuthResult>>("/auth/register", input);
+  async register(input: RegisterInput): Promise<AuthResult | VerificationRequired> {
+    const res = await apiClient.post<ApiEnvelope<AuthResult | VerificationRequired>>(
+      "/auth/register",
+      input,
+    );
     return unwrap(res.data);
   },
 
@@ -37,5 +40,13 @@ export const authService = {
       token,
       new_password: newPassword,
     });
+  },
+
+  async verifyEmail(token: string): Promise<void> {
+    await apiClient.post("/auth/verify-email", { token });
+  },
+
+  async resendVerification(email: string): Promise<void> {
+    await apiClient.post("/auth/resend-verification", { email });
   },
 };

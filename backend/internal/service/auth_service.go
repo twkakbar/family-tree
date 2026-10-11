@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strings"
 	"time"
 
@@ -23,35 +24,62 @@ type authService struct {
 	users           domain.UserRepository
 	refreshTokens   domain.RefreshTokenRepository
 	passwordResets  domain.PasswordResetTokenRepository
+	verifyTokens    domain.EmailVerificationTokenRepository
+	dispatches      domain.EmailDispatchRepository
+	mailer          domain.Mailer
+	publicURL       string
 	jwt             *token.JWTManager
 	hasher          *password.Hasher
 	refreshTokenTTL time.Duration
 	resetTokenTTL   time.Duration
+	verifyTokenTTL  time.Duration
 }
 
+const verificationEmailLimit = 3
+
 // NewAuthService wires the authentication business logic.
+// mailer may be nil. Verification email is sent only when mailer.Enabled()
+// is true and publicURL is set.
 func NewAuthService(
 	users domain.UserRepository,
 	refreshTokens domain.RefreshTokenRepository,
 	passwordResets domain.PasswordResetTokenRepository,
+	verifyTokens domain.EmailVerificationTokenRepository,
+	dispatches domain.EmailDispatchRepository,
 	jwt *token.JWTManager,
 	hasher *password.Hasher,
 	refreshTokenTTL time.Duration,
+	mailer domain.Mailer,
+	publicURL string,
 ) domain.AuthService {
 	return &authService{
 		users:           users,
 		refreshTokens:   refreshTokens,
 		passwordResets:  passwordResets,
+		verifyTokens:    verifyTokens,
+		dispatches:      dispatches,
+		mailer:          mailer,
+		publicURL:       strings.TrimRight(publicURL, "/"),
 		jwt:             jwt,
 		hasher:          hasher,
 		refreshTokenTTL: refreshTokenTTL,
 		resetTokenTTL:   time.Hour,
+		verifyTokenTTL:  24 * time.Hour,
 	}
 }
 
-// Register creates an account and immediately establishes a session.
-func (s *authService) Register(ctx context.Context, in domain.RegisterInput) (*domain.AuthResult, error) {
+func (s *authService) verificationEnabled() bool {
+	return s.mailer != nil && s.mailer.Enabled() && s.publicURL != ""
+}
+
+// Register creates an account. With SMTP configured it emails a verification
+// link and does not start a session. Without SMTP it verifies immediately
+// and signs the user in (local development and CI).
+func (s *authService) Register(ctx context.Context, in domain.RegisterInput) (*domain.RegisterResult, error) {
 	email := NormalizeEmail(in.Email)
+	if s.verificationEnabled() {
+		return s.registerUnverified(ctx, in, email)
+	}
 
 	hash, err := s.hasher.Hash(in.Password)
 	if err != nil {
@@ -69,13 +97,14 @@ func (s *authService) Register(ctx context.Context, in domain.RegisterInput) (*d
 		CreatedAt:       now,
 		UpdatedAt:       now,
 	}
-	// The partial unique index on email is the authoritative duplicate check;
-	// the repository translates violations into domain.ErrEmailTaken.
 	if err := s.users.Create(ctx, user); err != nil {
 		return nil, err
 	}
-
-	return s.issueSession(ctx, user)
+	session, err := s.issueSession(ctx, user)
+	if err != nil {
+		return nil, err
+	}
+	return &domain.RegisterResult{Session: session}, nil
 }
 
 // Login verifies credentials and establishes a session.
@@ -93,6 +122,9 @@ func (s *authService) Login(ctx context.Context, in domain.LoginInput) (*domain.
 
 	if !s.hasher.Verify(user.PasswordHash, in.Password) {
 		return nil, domain.ErrInvalidCredentials
+	}
+	if !user.EmailVerified() {
+		return nil, domain.ErrEmailNotVerified
 	}
 
 	return s.issueSession(ctx, user)
@@ -263,6 +295,134 @@ func (s *authService) ResetPassword(ctx context.Context, rawToken, newPassword s
 	_ = s.passwordResets.RevokeAllForUser(ctx, user.ID)
 	_ = s.refreshTokens.RevokeAllForUser(ctx, user.ID)
 	return nil
+}
+
+func (s *authService) registerUnverified(ctx context.Context, in domain.RegisterInput, email string) (*domain.RegisterResult, error) {
+	existing, err := s.users.GetByEmail(ctx, email)
+	if err == nil {
+		if existing.EmailVerified() {
+			return nil, domain.ErrEmailTaken
+		}
+		if err := s.sendVerification(ctx, existing); err != nil {
+			return nil, err
+		}
+		return &domain.RegisterResult{VerificationRequired: true}, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return nil, err
+	}
+
+	hash, err := s.hasher.Hash(in.Password)
+	if err != nil {
+		return nil, fmt.Errorf("register: %w", err)
+	}
+	now := time.Now().UTC()
+	user := &domain.User{
+		ID:           uuid.New(),
+		Name:         strings.TrimSpace(in.Name),
+		Email:        email,
+		PasswordHash: hash,
+		Role:         domain.RoleUser,
+		CreatedAt:    now,
+		UpdatedAt:    now,
+	}
+	if err := s.users.Create(ctx, user); err != nil {
+		return nil, err
+	}
+	if err := s.sendVerification(ctx, user); err != nil {
+		_ = s.users.SoftDelete(ctx, user.ID)
+		return nil, err
+	}
+	return &domain.RegisterResult{VerificationRequired: true}, nil
+}
+
+func (s *authService) ResendVerification(ctx context.Context, email string) error {
+	if !s.verificationEnabled() {
+		return nil
+	}
+	user, err := s.users.GetByEmail(ctx, NormalizeEmail(email))
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return nil
+		}
+		return err
+	}
+	if user.EmailVerified() {
+		return nil
+	}
+	return s.sendVerification(ctx, user)
+}
+
+func (s *authService) VerifyEmail(ctx context.Context, rawToken string) error {
+	if strings.TrimSpace(rawToken) == "" {
+		return domain.ErrTokenInvalid
+	}
+	stored, err := s.verifyTokens.GetByHash(ctx, token.HashOpaque(rawToken))
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return domain.ErrTokenInvalid
+		}
+		return err
+	}
+	now := time.Now().UTC()
+	if !stored.Valid(now) {
+		return domain.ErrTokenExpired
+	}
+	user, err := s.users.GetByID(ctx, stored.UserID)
+	if err != nil {
+		return err
+	}
+	user.EmailVerifiedAt = &now
+	user.UpdatedAt = now
+	if err := s.users.Update(ctx, user); err != nil {
+		return err
+	}
+	_ = s.verifyTokens.Revoke(ctx, stored.ID)
+	_ = s.verifyTokens.RevokeAllForUser(ctx, user.ID)
+	return nil
+}
+
+func (s *authService) sendVerification(ctx context.Context, user *domain.User) error {
+	since := time.Now().UTC().Add(-time.Hour)
+	count, err := s.dispatches.CountSince(ctx, user.Email, domain.EmailPurposeVerify, since)
+	if err != nil {
+		return err
+	}
+	if count >= verificationEmailLimit {
+		return domain.ErrRateLimited
+	}
+
+	if err := s.verifyTokens.RevokeAllForUser(ctx, user.ID); err != nil {
+		return err
+	}
+	raw, err := token.NewOpaque()
+	if err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	record := &domain.EmailVerificationToken{
+		ID:        uuid.New(),
+		UserID:    user.ID,
+		TokenHash: token.HashOpaque(raw),
+		ExpiresAt: now.Add(s.verifyTokenTTL),
+		CreatedAt: now,
+	}
+	if err := s.verifyTokens.Create(ctx, record); err != nil {
+		return err
+	}
+
+	link := s.publicURL + "/verify-email?token=" + url.QueryEscape(raw)
+	body := "Confirm your Kesultanan Aceh account by opening this link within 24 hours:\n\n" +
+		link + "\n\nIf you did not register, you can ignore this email.\n"
+	if err := s.mailer.Send(ctx, user.Email, "Verify your email", body); err != nil {
+		return fmt.Errorf("send verification email: %w", err)
+	}
+	return s.dispatches.Create(ctx, &domain.EmailDispatch{
+		ID:      uuid.New(),
+		Email:   user.Email,
+		Purpose: domain.EmailPurposeVerify,
+		SentAt:  now,
+	})
 }
 
 // issueSession generates the JWT access token and a rotating refresh token,

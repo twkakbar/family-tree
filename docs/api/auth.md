@@ -31,7 +31,9 @@ refresh token never appears in JSON.
 
 ## POST /api/v1/auth/register
 
-Creates an account and immediately establishes a session (auto-login).
+Creates an account. When SMTP is configured, the account stays unverified
+and the response is `{ "verification_required": true }` with no session.
+Without SMTP, the account is verified immediately and a session is created.
 
 Request:
 
@@ -42,8 +44,11 @@ Request:
 Validation: `name` 2–100 chars; `email` valid + unique among active
 accounts; `password` 8–128 chars with at least one letter and one digit.
 
-Responses: `201` AuthResult + refresh cookie · `422 VALIDATION_ERROR` ·
-`409 CONFLICT` (email taken).
+Responses: `201` AuthResult + refresh cookie when SMTP is off ·
+`201` `{ "verification_required": true }` when SMTP is on ·
+`409 CONFLICT` (verified email taken) ·
+`429 RATE_LIMITED` (more than 3 verification emails in an hour) ·
+`422 VALIDATION_ERROR`.
 
 ```bash
 curl -i -X POST http://localhost/api/v1/auth/register \
@@ -61,7 +66,8 @@ Request:
 
 Responses: `200` AuthResult + refresh cookie · `401 INVALID_CREDENTIALS`
 (identical for unknown email and wrong password — no account enumeration) ·
-`422 VALIDATION_ERROR`.
+`403 EMAIL_NOT_VERIFIED` when the password is correct but the address is
+not confirmed yet · `422 VALIDATION_ERROR`.
 
 ## POST /api/v1/auth/refresh
 
@@ -82,6 +88,24 @@ succeeds even without a valid session. The frontend also drops the
 in-memory access token (it expires within minutes regardless).
 
 Response: `204 No Content`.
+
+## POST /api/v1/auth/verify-email
+
+```json
+{ "token": "…" }
+```
+
+Responses: `200` `{ "verified": true }` · `401 TOKEN_INVALID | TOKEN_EXPIRED`.
+
+## POST /api/v1/auth/resend-verification
+
+```json
+{ "email": "jane@example.com" }
+```
+
+Sends another link when the account exists and is still unverified.
+Unknown or already-verified addresses return the same `200`. The 3-per-hour
+cap still applies to real sends.
 
 ## POST /api/v1/auth/forgot-password
 

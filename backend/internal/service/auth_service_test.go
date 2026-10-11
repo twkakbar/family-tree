@@ -17,7 +17,7 @@ func newTestAuthService() (domain.AuthService, *fakeUserRepo, *fakeRefreshTokenR
 	resets := newFakePasswordResetTokenRepo()
 	jwt := token.NewJWTManager("test-secret-that-is-32-characters!!", "test", 15*time.Minute)
 	hasher := password.NewHasher(4) // low cost for fast tests
-	svc := NewAuthService(users, tokens, resets, jwt, hasher, time.Hour)
+	svc := NewAuthService(users, tokens, resets, nil, nil, jwt, hasher, time.Hour, nil, "")
 	return svc, users, tokens
 }
 
@@ -31,7 +31,10 @@ func register(t *testing.T, svc domain.AuthService) *domain.AuthResult {
 	if err != nil {
 		t.Fatalf("Register() error = %v", err)
 	}
-	return result
+	if result.Session == nil {
+		t.Fatal("Register() session is nil")
+	}
+	return result.Session
 }
 
 func TestRegister(t *testing.T) {

@@ -9,12 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useRegister } from "@/hooks/use-auth";
+import { useRegister, useResendVerification } from "@/hooks/use-auth";
 import { registerSchema, type RegisterFormValues } from "@/lib/validations/auth";
 import { ApiError } from "@/types/api";
+import { isAuthResult } from "@/types/auth";
 
 export default function RegisterPage() {
   const register = useRegister();
+  const resend = useResendVerification();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -44,15 +46,24 @@ export default function RegisterPage() {
       ? register.error.message
       : null;
 
+  const needsVerification =
+    register.data !== undefined && !isAuthResult(register.data) && register.data.verification_required;
+  const submittedEmail = form.getValues("email");
+
   return (
     <Card className="border-0 bg-white/95 shadow-xl shadow-black/20 ring-teal-900/10">
       <CardTitle className="font-display text-2xl text-teal-950">Create your account</CardTitle>
       <CardDescription className="text-base">
-        Register so an administrator can grant tree edit access.
+        Register so an administrator can grant tree edit access. You must confirm your email first.
       </CardDescription>
 
       <form className="mt-6 space-y-4" noValidate onSubmit={form.handleSubmit(onSubmit)}>
         {apiError && <Alert tone="error">{apiError}</Alert>}
+        {needsVerification && (
+          <Alert tone="success">
+            Check {submittedEmail} for a verification link. You can request at most 3 emails per hour.
+          </Alert>
+        )}
 
         <div>
           <Label htmlFor="name" className="text-base">Full name</Label>
@@ -108,6 +119,19 @@ export default function RegisterPage() {
         <Button type="submit" size="lg" className="w-full py-3.5 text-base" loading={register.isPending}>
           Create account
         </Button>
+        {needsVerification && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="lg"
+            className="w-full py-3.5 text-base"
+            loading={resend.isPending}
+            onClick={() => resend.mutate(submittedEmail)}
+          >
+            Send the email again
+          </Button>
+        )}
+        {resend.isSuccess && <Alert tone="info">If the account still needs verification, another email was sent.</Alert>}
       </form>
 
       <p className="mt-6 text-center text-base text-slate-500">

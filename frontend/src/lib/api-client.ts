@@ -42,6 +42,8 @@ const AUTH_PATHS = [
   "/auth/logout",
   "/auth/forgot-password",
   "/auth/reset-password",
+  "/auth/verify-email",
+  "/auth/resend-verification",
 ];
 
 const isAuthPath = (url: string | undefined): boolean =>

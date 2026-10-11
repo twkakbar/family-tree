@@ -20,6 +20,20 @@ type LoginInput struct {
 	Password string
 }
 
+// RegisterResult is the outcome of creating an account.
+// Session is set only when email verification is not required (SMTP off).
+type RegisterResult struct {
+	Session              *AuthResult
+	VerificationRequired bool
+}
+
+// Mailer delivers transactional email. A nil or disabled mailer means
+// registration skips verification and signs the user in immediately.
+type Mailer interface {
+	Enabled() bool
+	Send(ctx context.Context, to, subject, text string) error
+}
+
 // AuthResult is returned by every operation that establishes a session.
 // The raw RefreshToken is delivered to the client exactly once (cookie);
 // only its hash is stored.
@@ -34,7 +48,7 @@ type AuthResult struct {
 // AuthService implements registration and the token lifecycle
 // (login, refresh rotation with reuse detection, logout).
 type AuthService interface {
-	Register(ctx context.Context, in RegisterInput) (*AuthResult, error)
+	Register(ctx context.Context, in RegisterInput) (*RegisterResult, error)
 	Login(ctx context.Context, in LoginInput) (*AuthResult, error)
 	// Refresh rotates a valid refresh token into a new token pair. Presenting
 	// a revoked token revokes every session of that user (reuse detection).
@@ -51,6 +65,11 @@ type AuthService interface {
 	RequestPasswordReset(ctx context.Context, email string) (rawToken string, err error)
 	// ResetPassword consumes a valid raw reset token and sets a new password.
 	ResetPassword(ctx context.Context, rawToken, newPassword string) error
+	// ResendVerification emails a new link when the account exists and is
+	// still unverified. Unknown or already-verified emails are a no-op.
+	ResendVerification(ctx context.Context, email string) error
+	// VerifyEmail consumes a one-time token and marks the account verified.
+	VerifyEmail(ctx context.Context, rawToken string) error
 }
 
 // UpdateProfileInput carries the mutable fields of the caller's own profile.

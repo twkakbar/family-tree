@@ -18,3 +18,4 @@ Format: Status / Context / Decision / Consequences. Keep them under a page.
 | [0009](0009-password-reset-no-smtp.md) | Password reset / email_verified without SMTP | Accepted |
 | [0010](00010-csp-security-headers.md) | CSP + hardened security headers at nginx | Accepted |
 | [0011](0011-ghcr-ci-deploy.md) | Build images in Actions and deploy from GHCR | Accepted |
+| [0012](0012-email-verification.md) | Verify new accounts by email when SMTP is set | Accepted |

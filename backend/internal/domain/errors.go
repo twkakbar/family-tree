@@ -60,4 +60,11 @@ var (
 
 	// ErrUnsupportedFormat signals an export/import document the server rejects.
 	ErrUnsupportedFormat = errors.New("unsupported transfer format")
+
+	// ErrEmailNotVerified signals a correct password for an account that has
+	// not confirmed its email yet.
+	ErrEmailNotVerified = errors.New("email is not verified")
+
+	// ErrRateLimited signals too many verification emails in the current hour.
+	ErrRateLimited = errors.New("too many verification emails")
 )

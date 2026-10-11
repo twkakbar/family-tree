@@ -28,8 +28,8 @@ canonical family tree for the whole site.
 - Multi-family creation / collaborator invite-by-email product UX.
 - Social features (feeds, comments, likes), DNA integrations, billing,
   mobile native apps, multi-tenant SaaS hosting.
-- Email delivery for access requests or password reset (in-app admin queue /
-  out-of-band reset tokens for now; see ADR-0009).
+- Email delivery for access requests or password reset (those stay in-app /
+  out-of-band). Registration verification email is sent when SMTP is configured.
 
 ## 3. Domain glossary (use these terms precisely)
 

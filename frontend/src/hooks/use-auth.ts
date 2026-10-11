@@ -7,7 +7,8 @@ import { authToken } from "@/lib/auth-token";
 import { queryKeys } from "@/lib/query-keys";
 import { authService } from "@/services/auth.service";
 import { usersService } from "@/services/users.service";
-import type { AuthResult } from "@/types/auth";
+import type { AuthResult, VerificationRequired } from "@/types/auth";
+import { isAuthResult } from "@/types/auth";
 
 /**
  * Auth hooks: the only way components interact with authentication.
@@ -35,16 +36,31 @@ export function useLogin(redirectTo: string = "/dashboard") {
   });
 }
 
-export function useRegister(redirectTo: string = "/dashboard") {
+export function useRegister() {
   const queryClient = useQueryClient();
   const router = useRouter();
 
   return useMutation({
     mutationFn: authService.register,
-    onSuccess: (result: AuthResult) => {
+    onSuccess: (result: AuthResult | VerificationRequired) => {
+      if (!isAuthResult(result)) {
+        return;
+      }
       establishSession(queryClient, result);
-      router.push(redirectTo);
+      router.push("/dashboard");
     },
+  });
+}
+
+export function useVerifyEmail() {
+  return useMutation({
+    mutationFn: (token: string) => authService.verifyEmail(token),
+  });
+}
+
+export function useResendVerification() {
+  return useMutation({
+    mutationFn: (email: string) => authService.resendVerification(email),
   });
 }
 

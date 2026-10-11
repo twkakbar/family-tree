@@ -19,3 +19,12 @@ export interface LoginInput {
   email: string;
   password: string;
 }
+
+export interface VerificationRequired {
+  verification_required: true;
+  message: string;
+}
+
+export function isAuthResult(value: AuthResult | VerificationRequired): value is AuthResult {
+  return "access_token" in value;
+}

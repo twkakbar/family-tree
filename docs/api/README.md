@@ -46,6 +46,8 @@ Stable, machine-readable codes (add new ones here in the same PR):
 | `NOT_FOUND` | 404 | Resource does not exist (or is soft-deleted) |
 | `METHOD_NOT_ALLOWED` | 405 | Wrong HTTP method on a known route |
 | `CONFLICT` | 409 | Uniqueness/state conflict (e.g. email taken) |
+| `EMAIL_NOT_VERIFIED` | 403 | Password is correct, but the address is not verified yet |
+| `RATE_LIMITED` | 429 | More than 3 verification emails for one address in the last hour |
 | `INTERNAL_ERROR` | 500 | Unexpected failure; correlate via `X-Request-ID` |
 
 Rate limiting is enforced by nginx (HTTP 429 with an nginx body, not the

@@ -33,6 +33,8 @@ type Config struct {
 	Upload         UploadConfig
 	Admin          AdminBootstrap
 	RoyalFamily    RoyalFamilyConfig
+	SMTP           SMTPConfig
+	PublicURL      string
 	RunMigrations  bool
 	TrustedProxies []string
 }
@@ -105,6 +107,15 @@ type RoyalFamilyConfig struct {
 	Description string
 }
 
+// SMTPConfig is outbound mail. Empty host disables verification email.
+type SMTPConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+}
+
 // Load reads configuration from the environment. In non-production it first
 // loads a local .env file when present (developer convenience; production
 // containers receive real environment variables from compose).
@@ -154,6 +165,14 @@ func Load() (*Config, error) {
 			Name:        getEnv("ROYAL_FAMILY_NAME", "Kesultanan Aceh"),
 			Description: getEnv("ROYAL_FAMILY_DESCRIPTION", "Silsilah keluarga kerajaan Aceh untuk dijelajahi publik."),
 		},
+		SMTP: SMTPConfig{
+			Host:     getEnv("SMTP_HOST", ""),
+			Port:     getEnvInt("SMTP_PORT", 465),
+			Username: getEnv("SMTP_USERNAME", ""),
+			Password: getEnv("SMTP_PASSWORD", ""),
+			From:     getEnv("SMTP_FROM", ""),
+		},
+		PublicURL:      strings.TrimRight(getEnv("APP_PUBLIC_URL", ""), "/"),
 		RunMigrations:  getEnvBool("RUN_MIGRATIONS", true),
 		TrustedProxies: splitNonEmpty(getEnv("TRUSTED_PROXIES", "")),
 	}
@@ -183,6 +202,10 @@ func (c *Config) validate() error {
 	}
 	if c.Auth.AccessTokenTTL <= 0 || c.Auth.RefreshTokenTTL <= 0 {
 		errs = append(errs, errors.New("token TTLs must be positive durations"))
+	}
+	smtpOn := c.SMTP.Host != "" || c.SMTP.Username != "" || c.SMTP.Password != "" || c.SMTP.From != ""
+	if smtpOn && (c.SMTP.Host == "" || c.SMTP.Username == "" || c.SMTP.Password == "" || c.SMTP.From == "" || c.PublicURL == "") {
+		errs = append(errs, errors.New("SMTP_HOST, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM, and APP_PUBLIC_URL are all required when SMTP is configured"))
 	}
 	if c.IsProduction() && !c.Auth.CookieSecure {
 		// Deliberately a warning-level decision: HTTP-only deployments exist

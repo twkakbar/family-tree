@@ -59,6 +59,8 @@ func New(cfg *config.Config, jwt *token.JWTManager, h Handlers) *gin.Engine {
 			auth.POST("/logout", h.Auth.Logout)
 			auth.POST("/forgot-password", h.Auth.ForgotPassword)
 			auth.POST("/reset-password", h.Auth.ResetPassword)
+			auth.POST("/verify-email", h.Auth.VerifyEmail)
+			auth.POST("/resend-verification", h.Auth.ResendVerification)
 		}
 
 		public := v1.Group("/public")

@@ -20,6 +20,7 @@ import (
 	"github.com/twkakbar/family-tree/backend/internal/routes"
 	"github.com/twkakbar/family-tree/backend/internal/service"
 	"github.com/twkakbar/family-tree/backend/internal/validation"
+	"github.com/twkakbar/family-tree/backend/pkg/mail"
 	"github.com/twkakbar/family-tree/backend/pkg/password"
 	"github.com/twkakbar/family-tree/backend/pkg/token"
 )
@@ -68,6 +69,8 @@ func run() error {
 	userRepo := repository.NewUserRepository(db)
 	refreshTokenRepo := repository.NewRefreshTokenRepository(db)
 	passwordResetRepo := repository.NewPasswordResetTokenRepository(db)
+	verifyTokenRepo := repository.NewEmailVerificationTokenRepository(db)
+	dispatchRepo := repository.NewEmailDispatchRepository(db)
 	familyRepo := repository.NewFamilyRepository(db)
 	collaboratorRepo := repository.NewFamilyCollaboratorRepository(db)
 	personRepo := repository.NewPersonRepository(db)
@@ -77,7 +80,17 @@ func run() error {
 	jwtManager := token.NewJWTManager(cfg.Auth.JWTSecret, cfg.Auth.JWTIssuer, cfg.Auth.AccessTokenTTL)
 	hasher := password.NewHasher(cfg.Auth.BcryptCost)
 
-	authService := service.NewAuthService(userRepo, refreshTokenRepo, passwordResetRepo, jwtManager, hasher, cfg.Auth.RefreshTokenTTL)
+	mailer := mail.NewSender(mail.SMTPConfig{
+		Host:     cfg.SMTP.Host,
+		Port:     cfg.SMTP.Port,
+		Username: cfg.SMTP.Username,
+		Password: cfg.SMTP.Password,
+		From:     cfg.SMTP.From,
+	})
+	authService := service.NewAuthService(
+		userRepo, refreshTokenRepo, passwordResetRepo, verifyTokenRepo, dispatchRepo,
+		jwtManager, hasher, cfg.Auth.RefreshTokenTTL, mailer, cfg.PublicURL,
+	)
 	userService := service.NewUserService(userRepo)
 	familyService := service.NewFamilyService(familyRepo, collaboratorRepo, userRepo)
 	personService := service.NewPersonService(

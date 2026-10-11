@@ -42,9 +42,16 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		respondError(c, err)
 		return
 	}
+	if result.VerificationRequired || result.Session == nil {
+		response.OK(c, http.StatusCreated, gin.H{
+			"verification_required": true,
+			"message":               "Check your email to verify your account before signing in.",
+		})
+		return
+	}
 
-	h.setRefreshCookie(c, result.RefreshToken, result.RefreshTokenExpiresAt)
-	response.OK(c, http.StatusCreated, toAuthResponse(result))
+	h.setRefreshCookie(c, result.Session.RefreshToken, result.Session.RefreshTokenExpiresAt)
+	response.OK(c, http.StatusCreated, toAuthResponse(result.Session))
 }
 
 // Login handles POST /api/v1/auth/login.
@@ -138,6 +145,43 @@ func (h *AuthHandler) ResetPassword(c *gin.Context) {
 		return
 	}
 	response.OK(c, http.StatusOK, gin.H{"reset": true})
+}
+
+type verifyEmailRequest struct {
+	Token string `json:"token" binding:"required"`
+}
+
+type resendVerificationRequest struct {
+	Email string `json:"email" binding:"required,email"`
+}
+
+// VerifyEmail handles POST /api/v1/auth/verify-email.
+func (h *AuthHandler) VerifyEmail(c *gin.Context) {
+	var req verifyEmailRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	if err := h.auth.VerifyEmail(c.Request.Context(), req.Token); err != nil {
+		respondError(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, gin.H{"verified": true})
+}
+
+// ResendVerification handles POST /api/v1/auth/resend-verification.
+func (h *AuthHandler) ResendVerification(c *gin.Context) {
+	var req resendVerificationRequest
+	if !bindJSON(c, &req) {
+		return
+	}
+	if err := h.auth.ResendVerification(c.Request.Context(), req.Email); err != nil {
+		respondError(c, err)
+		return
+	}
+	response.OK(c, http.StatusOK, gin.H{
+		"sent":    true,
+		"message": "If that account still needs verification, a new email was sent.",
+	})
 }
 
 func (h *AuthHandler) setRefreshCookie(c *gin.Context, token string, expiresAt time.Time) {

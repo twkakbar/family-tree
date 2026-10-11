@@ -19,7 +19,7 @@ func TestPasswordResetFlow(t *testing.T) {
 	resets := newFakePasswordResetTokenRepo()
 	jwt := token.NewJWTManager("test-secret-that-is-32-characters!!", "test", 15*time.Minute)
 	hasher := password.NewHasher(4)
-	svc := NewAuthService(users, tokens, resets, jwt, hasher, time.Hour)
+	svc := NewAuthService(users, tokens, resets, nil, nil, jwt, hasher, time.Hour, nil, "")
 
 	_, err := svc.Register(context.Background(), domain.RegisterInput{
 		Name: "Reset User", Email: "reset@example.com", Password: "password123",

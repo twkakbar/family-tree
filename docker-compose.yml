@@ -57,6 +57,12 @@ services:
       ADMIN_NAME: ${ADMIN_NAME:-Administrator}
       ROYAL_FAMILY_NAME: ${ROYAL_FAMILY_NAME:-Kesultanan Aceh}
       ROYAL_FAMILY_DESCRIPTION: ${ROYAL_FAMILY_DESCRIPTION:-Silsilah keluarga kerajaan Aceh untuk dijelajahi publik.}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      APP_PUBLIC_URL: ${APP_PUBLIC_URL:-}
     volumes:
       - uploads_data:/app/uploads
     depends_on:

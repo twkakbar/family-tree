@@ -2,6 +2,7 @@ package domain
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -96,4 +97,18 @@ type PasswordResetTokenRepository interface {
 	GetByHash(ctx context.Context, tokenHash string) (*PasswordResetToken, error)
 	Revoke(ctx context.Context, id uuid.UUID) error
 	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// EmailVerificationTokenRepository persists email-verification token hashes.
+type EmailVerificationTokenRepository interface {
+	Create(ctx context.Context, token *EmailVerificationToken) error
+	GetByHash(ctx context.Context, tokenHash string) (*EmailVerificationToken, error)
+	Revoke(ctx context.Context, id uuid.UUID) error
+	RevokeAllForUser(ctx context.Context, userID uuid.UUID) error
+}
+
+// EmailDispatchRepository records outbound mail for rate limits.
+type EmailDispatchRepository interface {
+	Create(ctx context.Context, row *EmailDispatch) error
+	CountSince(ctx context.Context, email, purpose string, since time.Time) (int64, error)
 }

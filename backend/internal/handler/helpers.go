@@ -120,6 +120,10 @@ func respondError(c *gin.Context, err error) {
 		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "invalid photo upload (use JPEG, PNG, or WebP within size limit)")
 	case errors.Is(err, domain.ErrUnsupportedFormat):
 		response.Error(c, http.StatusUnprocessableEntity, codeValidation, "unsupported or invalid tree transfer document")
+	case errors.Is(err, domain.ErrEmailNotVerified):
+		response.Error(c, http.StatusForbidden, "EMAIL_NOT_VERIFIED", "verify your email before signing in")
+	case errors.Is(err, domain.ErrRateLimited):
+		response.Error(c, http.StatusTooManyRequests, "RATE_LIMITED", "you can request at most 3 verification emails per hour")
 	default:
 		slog.Error("unhandled error",
 			"error", err,
