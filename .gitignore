@@ -6,6 +6,7 @@
 .env
 .env.*
 !.env.example
+.local-secrets/
 
 # --- OS / editor -------------------------------------------
 .DS_Store
