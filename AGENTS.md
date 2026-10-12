@@ -190,12 +190,20 @@ Ops: `docs/DEPLOYMENT.md` (backups, monitoring, security headers).
 ## Learned User Preferences
 
 - The public first screen is the 3D explore tree. The earlier homepage is an about page reached from home. `/login` and `/register` stay available by URL, without sign-in or edit-access prompts on public pages.
-- Studio and admin member entry stays simple enough for older editors: one name field, male or female only in that form, a search when choosing who to link, and a popup to edit the person selected on the tree.
-- Relationships are added by dragging on the tree. Long names and birth places stay readable; name plaques use one compact size and show the full name on hover.
-- Public tree, studio, and admin share a modern Aceh look: gold-rimmed portrait medallions, a teal sea-depth background, an Aceh identity icon, and photo previews that show the whole image.
+- Studio and admin member entry stays simple enough for older editors: one name field, male or female only in that form, a search when choosing who to link, and a popup to edit the person selected on the tree. Saving a member shows a clear success or error message.
+- Relationships are added by dragging on the tree. Hide links that break the family, and name the other person on each parent or spouse row so Remove is unambiguous. Long names and birth places stay readable; name plaques use one compact size and show the full name on hover.
+- Public tree, studio, and admin share a modern Aceh look: gold-rimmed portrait medallions, a teal sea-depth background, an Aceh identity icon, and photo previews that show the whole image. On a phone, the member card is a full-width sheet above the tree labels, a tap on the empty backdrop closes it, and a finger swipe pans the tree by the full gesture.
+- Reply in Indonesian. When a choice is uncertain, ask instead of guessing.
+- Run lint and typecheck locally before pushing to `main`.
 - Update `README.md` with the product whenever features change; the user checks it for staleness.
 
 ## Learned Workspace Facts
 
-- Public tree nodes are gold-rimmed portrait medallions (photo or initials) on a teal sea-depth backdrop.
+- Public tree nodes are gold-rimmed portrait medallions (photo, or initials drawn inside the ring) on a teal sea-depth backdrop. Relationship lines stop at the gold rim.
 - The simple member form offers only male and female. Person API and database gender values remain `male`, `female`, `other`, and `unknown`.
+- A husband may have more than one wife. A wife who already has a husband cannot be given another, by drag or by the add-member form. The same couple cannot be linked twice. Spouses cannot be blood relatives, a child has at most two parents, and a parent cannot be born after the child when both dates are set. Extra wives sit to the left and right of the person who carries the descent line. A spouse with no parents in the tree stays beside their partner on that generation.
+- Registration requires email verification. Sends are limited to 3 per address per hour. SMTP settings come from environment variables; the sender is `noreply@twkakbar.my.id`.
+- Source Sans 3 and Cormorant Garamond ship as npm packages so the frontend image can build without downloading fonts from Google.
+- Production is `https://twkakbar.my.id` (TLS on the apex host) on Ubuntu 24.04 with 2 vCPU, 4 GB RAM, and 60 GB disk. GitHub Actions builds the images and the VPS only pulls them. A push to `main` deploys after CI. A git tag or GitHub Release is only a version label. Secrets stay in gitignored `.local-secrets/` and in `/opt/family-tree/.env` on the VPS.
+- Photo upload needs the uploads directory writable by the `app` user. A root-owned folder returns 500.
+- CI's public-meta smoke needs an admin bootstrap so the royal family exists. That database is removed with `docker compose down -v` and does not affect production.

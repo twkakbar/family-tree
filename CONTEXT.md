@@ -42,7 +42,7 @@ canonical family tree for the whole site.
 | **Access request** | A registered user asking for editor rights; status `pending` / `approved` / `rejected`. |
 | **Person** | A node in the royal tree (a family member). Pure data — not a login. |
 | **Relationship** | Typed edge: `parent` (from parent → to child) or `spouse` (canonical order). A husband may have more than one wife. A wife can have only one husband. A spouse cannot be a parent, child, sibling, ancestor, or descendant. A child has at most two parents, and a parent cannot be born after the child. |
-| **Tree** | The rendered graph of persons + relationships of the royal family. |
+| **Tree** | The rendered graph of persons + relationships of the royal family. Spouses share a solid horizontal line. Children of the same parents branch from the midpoint of that couple. |
 
 The distinction **User ≠ Person** remains fundamental.
 

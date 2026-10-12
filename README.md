@@ -16,7 +16,7 @@ genealogy SaaS.
 
 | Surface | Purpose |
 |---------|---------|
-| `/` | Public 3D explore (portrait medallions, sea-depth backdrop) |
+| `/` | Public 3D explore (portrait medallions, couple-and-children branches, sea-depth backdrop) |
 | `/about` | Brand / story |
 | `/studio` | Editors: add members, photos, relationships, JSON backup |
 | `/request-access` | Descendants ask for edit rights |

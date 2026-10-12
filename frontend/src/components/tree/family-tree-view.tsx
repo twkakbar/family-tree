@@ -10,17 +10,13 @@ import {
   type RelationshipLinkChoice,
 } from "@/components/tree/relationship-link-picker";
 import { PersonTreeNode } from "@/components/tree/person-tree-node";
+import { TreeLegend } from "@/components/tree/tree-legend";
 import { TreeToolbar } from "@/components/tree/tree-toolbar";
 import { useCreateRelationship, useFamilyTree } from "@/hooks/use-persons";
 import { ApiError } from "@/types/api";
 import type { Person, TreeNodePosition } from "@/types/person";
-import {
-  edgePath,
-  findNode,
-  layoutFamilyTree,
-  nodeCenter,
-  treeMetrics,
-} from "@/utils/tree-layout";
+import { studioPedigree } from "@/utils/pedigree";
+import { findNode, layoutFamilyTree, nodeCenter, treeMetrics } from "@/utils/tree-layout";
 import { cn } from "@/utils/cn";
 
 const LINK_DRAG_THRESHOLD_PX = 8;
@@ -240,6 +236,9 @@ export function FamilyTreeView({
             setIsPanning(false);
           }}
         >
+          <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-xl bg-white/90 px-3 py-2 shadow-sm ring-1 ring-slate-200">
+            <TreeLegend tone="light" />
+          </div>
           <div
             className="absolute left-0 top-0 origin-top-left will-change-transform"
             style={{
@@ -247,21 +246,17 @@ export function FamilyTreeView({
             }}
           >
             <svg width={layout.width} height={layout.height} className="overflow-visible">
-              {layout.edges.map((edge) => {
-                const from = findNode(layout.nodes, edge.from_person_id);
-                const to = findNode(layout.nodes, edge.to_person_id);
-                if (!from || !to) return null;
-                return (
-                  <path
-                    key={edge.id}
-                    d={edgePath(from, to, edge.type)}
-                    fill="none"
-                    stroke={edge.type === "spouse" ? "#94a3b8" : "#10b981"}
-                    strokeWidth={edge.type === "spouse" ? 2 : 2.5}
-                    strokeDasharray={edge.type === "spouse" ? "6 4" : undefined}
-                  />
-                );
-              })}
+              {studioPedigree(layout.nodes, layout.edges).map((line, index) => (
+                <path
+                  key={`${line.kind}-${index}`}
+                  d={line.d}
+                  fill="none"
+                  stroke={line.kind === "spouse" ? "#a16207" : "#0f766e"}
+                  strokeWidth={line.kind === "spouse" ? 2 : 2.25}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
 
               {linkDrag && (
                 <>

@@ -273,26 +273,4 @@ export function findNode(nodes: TreeNodePosition[], personId: string): TreeNodeP
   return nodes.find((n) => n.person.id === personId);
 }
 
-export function edgePath(from: TreeNodePosition, to: TreeNodePosition, type: Relationship["type"]): string {
-  const start = nodeCenter(from);
-  const end = nodeCenter(to);
-
-  if (type === "spouse") {
-    const left = start.x <= end.x ? from : to;
-    const right = start.x <= end.x ? to : from;
-    const y = (nodeCenter(left).y + nodeCenter(right).y) / 2;
-    const gap = right.x - (left.x + NODE_WIDTH);
-    const sameRow = Math.abs(left.y - right.y) < 2;
-    if (!sameRow || gap <= H_GAP + 8) {
-      return `M ${left.x + NODE_WIDTH} ${y} L ${right.x} ${y}`;
-    }
-    const arcY = Math.min(left.y, right.y) - 28;
-    const midX = (left.x + NODE_WIDTH + right.x) / 2;
-    return `M ${left.x + NODE_WIDTH} ${y} Q ${midX} ${arcY}, ${right.x} ${y}`;
-  }
-
-  const midY = (start.y + end.y) / 2;
-  return `M ${start.x} ${start.y + NODE_HEIGHT / 2} C ${start.x} ${midY}, ${end.x} ${midY}, ${end.x} ${end.y - NODE_HEIGHT / 2}`;
-}
-
 export const treeMetrics = { NODE_WIDTH, NODE_HEIGHT };

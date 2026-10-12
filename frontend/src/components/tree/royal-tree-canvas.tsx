@@ -6,7 +6,8 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import * as THREE from "three";
 
 import type { FamilyTreeData, Person } from "@/types/person";
-import { displayName, findNode3D, layoutTree3D, type Node3D } from "@/utils/tree-layout-3d";
+import { kinshipLayout } from "@/utils/pedigree";
+import { displayName, layoutTree3D, type Node3D } from "@/utils/tree-layout-3d";
 
 interface RoyalTreeCanvasProps {
   data: FamilyTreeData;
@@ -18,6 +19,7 @@ interface RoyalTreeCanvasProps {
 
 const GOLD = "#d4af37";
 const GOLD_BRIGHT = "#f0c75e";
+const DESCENT = "#5eead4";
 const INK = "#04151a";
 /** Outer gold edge. Lines stop here so they do not cut through the portrait. */
 const MEDALLION_RADIUS = 0.36;
@@ -262,33 +264,98 @@ function initialsFrom(name: string): string {
 }
 
 function EdgeLines({ nodes, edges }: { nodes: Node3D[]; edges: FamilyTreeData["relationships"] }) {
+  const { spouses, descents } = kinshipLayout(edges);
+  const byId = new Map(nodes.map((node) => [node.person.id, node]));
+
   return (
     <>
-      {edges.map((edge) => {
-        const from = findNode3D(nodes, edge.from_person_id);
-        const to = findNode3D(nodes, edge.to_person_id);
+      {spouses.map((pair) => {
+        const from = byId.get(pair.a);
+        const to = byId.get(pair.b);
         if (!from || !to) return null;
-        const points =
-          edge.type === "spouse"
-            ? spousePoints(from, to, nodes, MEDALLION_RADIUS)
-            : trimmedEnds(from, to, MEDALLION_RADIUS);
-        const isSpouse = edge.type === "spouse";
         return (
           <Line
-            key={edge.id}
-            points={points}
-            color={isSpouse ? GOLD : "#2a8f86"}
-            lineWidth={isSpouse ? 1.1 : 1.6}
-            dashed={isSpouse}
-            dashSize={0.12}
-            gapSize={0.1}
-            transparent
-            opacity={isSpouse ? 0.7 : 0.8}
+            key={`spouse-${pair.a}-${pair.b}`}
+            points={spousePoints(from, to, nodes, MEDALLION_RADIUS)}
+            color={GOLD}
+            lineWidth={1.5}
           />
+        );
+      })}
+      {descents.map((group) => {
+        const parents = group.parentIds
+          .map((id) => byId.get(id))
+          .filter((node): node is Node3D => Boolean(node));
+        const children = group.childIds
+          .map((id) => byId.get(id))
+          .filter((node): node is Node3D => Boolean(node));
+        if (parents.length === 0 || children.length === 0) return null;
+        return (
+          <group key={`descent-${group.parentIds.join("-")}`}>
+            {descentPolylines(parents, children, nodes, MEDALLION_RADIUS).map((points, index) => (
+              <Line key={index} points={points} color={DESCENT} lineWidth={1.7} />
+            ))}
+          </group>
         );
       })}
     </>
   );
+}
+
+/** One stem from the couple, then a bar that drops to each child. */
+function descentPolylines(
+  parents: Node3D[],
+  children: Node3D[],
+  nodes: Node3D[],
+  radius: number,
+): THREE.Vector3[][] {
+  const parentBottom = Math.min(...parents.map((parent) => parent.y - radius));
+  const childTop = Math.max(...children.map((child) => child.y + radius));
+  const barY = (parentBottom + childTop) / 2;
+  const z = parents.reduce((sum, parent) => sum + parent.z, 0) / parents.length;
+
+  let dropX = parents[0].x;
+  let stemTop = parents[0].y - radius;
+  if (parents.length >= 2) {
+    const ordered = [...parents].sort((a, b) => a.x - b.x);
+    const left = ordered[0];
+    const right = ordered[ordered.length - 1];
+    const between = nodes
+      .filter(
+        (node) =>
+          !parents.some((parent) => parent.person.id === node.person.id) &&
+          Math.abs(node.y - left.y) < 0.6 &&
+          node.x > left.x + 0.2 &&
+          node.x < right.x - 0.2,
+      )
+      .sort((a, b) => a.x - b.x);
+    const sameRow = Math.abs(left.y - right.y) < 0.5;
+    if (sameRow && between.length === 0) {
+      dropX = (left.x + right.x) / 2;
+      stemTop = (left.y + right.y) / 2;
+    } else if (between.length > 0) {
+      dropX = (left.x + between[0].x) / 2;
+      stemTop = Math.min(left.y, right.y) - radius;
+    } else {
+      dropX = parents.reduce((sum, parent) => sum + parent.x, 0) / parents.length;
+      stemTop = parentBottom;
+    }
+  }
+
+  const lines: THREE.Vector3[][] = [[new THREE.Vector3(dropX, stemTop, z), new THREE.Vector3(dropX, barY, z)]];
+  const childXs = children.map((child) => child.x);
+  const barLeft = Math.min(dropX, ...childXs);
+  const barRight = Math.max(dropX, ...childXs);
+  if (barRight - barLeft > 0.05) {
+    lines.push([new THREE.Vector3(barLeft, barY, z), new THREE.Vector3(barRight, barY, z)]);
+  }
+  for (const child of children) {
+    lines.push([
+      new THREE.Vector3(child.x, barY, z),
+      new THREE.Vector3(child.x, child.y + radius, child.z),
+    ]);
+  }
+  return lines;
 }
 
 /** Spouse lines rise over anyone sitting between the two partners. */

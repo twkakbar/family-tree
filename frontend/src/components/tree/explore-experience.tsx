@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Spinner } from "@/components/ui/spinner";
+import { TreeLegend } from "@/components/tree/tree-legend";
 import { usePublicPerson, usePublicTree, useRoyalMeta } from "@/hooks/use-public";
 import type { Person } from "@/types/person";
 import { displayName } from "@/utils/tree-layout-3d";
@@ -37,6 +38,9 @@ export function ExploreExperience() {
           <p className="mt-1 text-xs text-teal-100/70 sm:text-sm">
             Drag to orbit · scroll to zoom · tap a member
           </p>
+          <div className="mt-2">
+            <TreeLegend tone="dark" />
+          </div>
         </div>
         <Link
           href="/about"
