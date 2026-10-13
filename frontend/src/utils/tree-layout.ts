@@ -63,6 +63,10 @@ export function assignGenerations(data: FamilyTreeData): Map<string, number> {
 
 /** People in each generation, spouses adjacent and rows ordered under their parents. */
 export function peopleByGeneration(data: FamilyTreeData): Person[][] {
+  return arrangeTree(data).rows;
+}
+
+export function arrangeTree(data: FamilyTreeData): { rows: Person[][]; slots: Map<string, number> } {
   const generations = assignGenerations(data);
   const parentRels = data.relationships.filter((rel) => rel.type === "parent");
   const spouseRels = data.relationships.filter((rel) => rel.type === "spouse");
@@ -76,27 +80,55 @@ export function peopleByGeneration(data: FamilyTreeData): Person[][] {
   }
 
   const sortedGens = [...byGeneration.keys()].sort((a, b) => a - b);
-  const placedX = new Map<string, number>();
+  const slots = new Map<string, number>();
   const rows: Person[][] = [];
 
   for (const gen of sortedGens) {
     const people = byGeneration.get(gen) ?? [];
-    const row = orderGeneration(people, gen, generations, parentRels, spouseRels, placedX);
-    row.forEach((person, index) => placedX.set(person.id, index));
+    const units = generationUnits(people, gen, generations, parentRels, spouseRels, slots);
+    const bands = groupByParents(units, parentRels, slots);
+    let rightEdge = Number.NEGATIVE_INFINITY;
+    const row: Person[] = [];
+
+    for (const band of bands) {
+      const flat = band.flat();
+      const anchor = unitAnchor(band[0], parentRels, spouseRels, generations, slots);
+      const pin = band.length === 1 ? bloodIndex(band[0], parentRels, slots) : -1;
+      let positions = placeBand(flat, anchor, pin, rightEdge);
+      const min = Math.min(...positions);
+      if (Number.isFinite(rightEdge) && min < rightEdge + 1) {
+        const shift = rightEdge + 1 - min;
+        positions = positions.map((slot) => slot + shift);
+      }
+      flat.forEach((person, index) => slots.set(person.id, positions[index]));
+      rightEdge = Math.max(...positions);
+      row.push(...flat);
+    }
+
     rows.push(row);
   }
 
-  return rows;
+  return { rows, slots };
 }
 
-function orderGeneration(
+/** Pin one bloodline person under their parent. Center a row of siblings on the shared parents. */
+function placeBand(people: Person[], anchor: number, pin: number, rightEdge: number): number[] {
+  if (!Number.isFinite(anchor)) {
+    const start = Number.isFinite(rightEdge) ? rightEdge + 1 : 0;
+    return people.map((_, index) => start + index);
+  }
+  const origin = pin >= 0 ? pin : (people.length - 1) / 2;
+  return people.map((_, index) => anchor + (index - origin));
+}
+
+function generationUnits(
   people: Person[],
   gen: number,
   generations: Map<string, number>,
   parentRels: Relationship[],
   spouseRels: Relationship[],
   placedX: Map<string, number>,
-): Person[] {
+): Person[][] {
   const used = new Set<string>();
   const units: Person[][] = [];
 
@@ -114,7 +146,40 @@ function orderGeneration(
     return displayName(a[0]).localeCompare(displayName(b[0]));
   });
 
-  return units.flat();
+  return units;
+}
+
+function groupByParents(
+  units: Person[][],
+  parentRels: Relationship[],
+  placedX: Map<string, number>,
+): Person[][][] {
+  const bands: Person[][][] = [];
+  for (const unit of units) {
+    const key = parentKey(unit, parentRels, placedX);
+    const last = bands[bands.length - 1];
+    const lastKey = last ? parentKey(last[0], parentRels, placedX) : undefined;
+    if (last && key && key === lastKey) last.push(unit);
+    else bands.push([unit]);
+  }
+  return bands;
+}
+
+function parentKey(unit: Person[], parentRels: Relationship[], placedX: Map<string, number>): string {
+  const ids = new Set<string>();
+  for (const person of unit) {
+    for (const rel of parentRels) {
+      if (rel.to_person_id === person.id && placedX.has(rel.from_person_id)) ids.add(rel.from_person_id);
+    }
+  }
+  return [...ids].sort().join("|");
+}
+
+function bloodIndex(unit: Person[], parentRels: Relationship[], placedX: Map<string, number>): number {
+  const indexes = unit.flatMap((person, index) =>
+    parentRels.some((rel) => rel.to_person_id === person.id && placedX.has(rel.from_person_id)) ? [index] : [],
+  );
+  return indexes.length === 1 ? indexes[0] : -1;
 }
 
 function householdOnRow(
@@ -229,22 +294,24 @@ export function layoutFamilyTree(data: FamilyTreeData): TreeLayout {
   }
 
   const personById = new Map(data.persons.map((p) => [p.id, p]));
-  const rows = peopleByGeneration(data);
-  const maxRow = Math.max(...rows.map((row) => row.length), 1);
-  const maxRowWidth = maxRow * NODE_WIDTH + Math.max(0, maxRow - 1) * H_GAP;
+  const { rows, slots } = arrangeTree(data);
+  const slotValues = [...slots.values()];
+  const minSlot = Math.min(...slotValues);
+  const maxSlot = Math.max(...slotValues);
+  const span = Math.max(0, maxSlot - minSlot);
+  const maxRowWidth = span * (NODE_WIDTH + H_GAP) + NODE_WIDTH;
   const nodes: TreeNodePosition[] = [];
 
   rows.forEach((row, gen) => {
-    const rowWidth = row.length * NODE_WIDTH + Math.max(0, row.length - 1) * H_GAP;
-    const startX = PADDING + (maxRowWidth - rowWidth) / 2;
-    row.forEach((person, index) => {
+    for (const person of row) {
+      const slot = slots.get(person.id) ?? minSlot;
       nodes.push({
         person,
         generation: gen,
-        x: startX + index * (NODE_WIDTH + H_GAP),
+        x: PADDING + (slot - minSlot) * (NODE_WIDTH + H_GAP),
         y: PADDING + gen * (NODE_HEIGHT + V_GAP),
       });
-    });
+    }
   });
 
   const maxGen = Math.max(0, rows.length - 1);

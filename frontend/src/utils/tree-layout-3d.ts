@@ -1,5 +1,5 @@
 import type { FamilyTreeData, Person, Relationship } from "@/types/person";
-import { peopleByGeneration } from "@/utils/tree-layout";
+import { arrangeTree } from "@/utils/tree-layout";
 
 export interface Node3D {
   person: Person;
@@ -23,20 +23,21 @@ export function layoutTree3D(data: FamilyTreeData): Layout3D {
     return { nodes: [], edges: [] };
   }
 
-  const rows = peopleByGeneration(data);
+  const { rows, slots } = arrangeTree(data);
+  const slotValues = [...slots.values()];
+  const mid = (Math.min(...slotValues) + Math.max(...slotValues)) / 2;
   const nodes: Node3D[] = [];
 
   rows.forEach((row, gen) => {
-    const offset = (row.length - 1) / 2;
-    row.forEach((person, index) => {
+    for (const person of row) {
       nodes.push({
         person,
         generation: gen,
-        x: (index - offset) * X_GAP,
+        x: ((slots.get(person.id) ?? mid) - mid) * X_GAP,
         y: -gen * Y_GAP,
         z: 0,
       });
-    });
+    }
   });
 
   const ids = new Set(data.persons.map((p) => p.id));
